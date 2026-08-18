@@ -2,7 +2,23 @@ import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "bun:test";
+
+// bun:test has no vi.waitFor. Polls an assertion until it stops throwing,
+// which is all the two call sites below need.
+async function waitFor(fn: () => unknown, timeoutMs = 10_000, stepMs = 10) {
+	const deadline = Date.now() + timeoutMs;
+	let lastErr: unknown;
+	for (;;) {
+		try {
+			return await fn();
+		} catch (err) {
+			lastErr = err;
+			if (Date.now() > deadline) throw lastErr;
+			await new Promise((r) => setTimeout(r, stepMs));
+		}
+	}
+}
 
 import {
   buildPayload,
@@ -328,7 +344,7 @@ describe("extension entrypoint", () => {
       // Handlers fire the refresh without awaiting it: a statusline must never
       // block the session, so the assertion polls instead.
       await pi.emit("session_start", { type: "session_start", reason: "startup" }, ctx);
-      await vi.waitFor(() => expect(statuses.length).toBe(1));
+      await waitFor(() => expect(statuses.length).toBe(1));
       const [key, text] = statuses[0];
       expect(key).toBe("agent-statusline");
       const wire = JSON.parse(String(text));
@@ -405,7 +421,7 @@ describe("extension entrypoint", () => {
       );
       await pi.emit("agent_settled", { type: "agent_settled" }, ctx);
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         const last = statuses.at(-1);
         expect(last).toBeDefined();
         const wire = JSON.parse(String(last?.[1]));

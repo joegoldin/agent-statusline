@@ -9,9 +9,6 @@
     "extensions": ["./statusline.ts"]
   },
   "scripts": {
-    "test": "vitest run"
-  },
-  "devDependencies": {
-    "vitest": "^2.1.9"
+    "test": "bun test"
   }
 }

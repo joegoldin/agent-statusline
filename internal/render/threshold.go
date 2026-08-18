@@ -4,14 +4,17 @@ package render
 // yellow 70–85, red >=85. Used for the surrounding text (glyph + percent)
 // next to a bar so the alarm signal is sharp even when the bar itself
 // renders a smooth gradient.
-func ThresholdColor(pct float64) func(string) string {
+func ThresholdColor(pct float64) func(string) string { return ThresholdIntent(pct).Wrap }
+
+// ThresholdIntent is ThresholdColor expressed semantically.
+func ThresholdIntent(pct float64) Intent {
 	switch {
 	case pct >= 85:
-		return Red
+		return IntentDanger
 	case pct >= 70:
-		return Yellow
+		return IntentWarn
 	default:
-		return Green
+		return IntentOK
 	}
 }
 
@@ -26,17 +29,22 @@ func ThresholdColor(pct float64) func(string) string {
 //
 // Thresholds bias warmer earlier than the 3-step palette so context
 // pressure shows up well before the conversation actually hits a wall.
-func ThresholdColor5(pct float64) func(string) string {
+func ThresholdColor5(pct float64) func(string) string { return ThresholdIntent5(pct).Wrap }
+
+// ThresholdIntent5 is ThresholdColor5 expressed semantically. The caution step
+// is the one pi cannot reproduce exactly: themes expose no orange slot, so the
+// pi encoder renders it as a bolded warning.
+func ThresholdIntent5(pct float64) Intent {
 	switch {
 	case pct >= 75:
-		return Red
+		return IntentDanger
 	case pct >= 60:
-		return Orange
+		return IntentCaution
 	case pct >= 45:
-		return Yellow
+		return IntentWarn
 	case pct >= 30:
-		return Green
+		return IntentOK
 	default:
-		return Dim
+		return IntentDim
 	}
 }

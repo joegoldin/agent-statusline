@@ -18,10 +18,11 @@ func (Cost) Render(ctx *Context) (string, bool) {
 	if c == nil || c.TotalCostUSD <= 0 {
 		return "", false
 	}
-	// Claude Max subscribers don't pay for usage inside their plan limits.
-	// Only surface cost when rate limits are absent (non-Max user) or when
-	// either window has reached 100% (overage territory).
-	if !inOverage(ctx.Status.RateLimits) {
+	// Claude Max subscribers don't pay for usage inside their plan limits, so
+	// in Claude mode cost only surfaces in overage territory. Under pi the auth
+	// is Codex / API key / OpenRouter, where every token is billed and cost is
+	// the primary meter — so it always shows.
+	if ctx.Mode != input.ModePi && !inOverage(ctx.Status.RateLimits) {
 		return "", false
 	}
 	return render.Red(fmt.Sprintf("%s$%.2f", costGlyph, c.TotalCostUSD)), true

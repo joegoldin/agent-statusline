@@ -76,3 +76,45 @@ func TestCostHidesAtZero(t *testing.T) {
 		t.Errorf("expected hidden at 0")
 	}
 }
+
+func TestCostAlwaysVisibleInPiMode(t *testing.T) {
+	ctx := &Context{
+		Mode: input.ModePi,
+		Status: input.Status{
+			Cost: &input.Cost{TotalCostUSD: 1.23},
+			// No RateLimits: exactly the non-Anthropic case.
+		},
+	}
+	text, visible := (Cost{}).Render(ctx)
+	if !visible {
+		t.Fatal("cost widget hidden in pi mode; want visible")
+	}
+	if !strings.Contains(text, "1.23") {
+		t.Errorf("cost text = %q, want it to contain 1.23", text)
+	}
+}
+
+func TestCostStillGatedInClaudeMode(t *testing.T) {
+	ctx := &Context{
+		Mode: input.ModeClaude,
+		Status: input.Status{
+			Cost: &input.Cost{TotalCostUSD: 1.23},
+			RateLimits: &input.RateLimits{
+				FiveHour: &input.Window{UsedPercentage: 10},
+			},
+		},
+	}
+	if _, visible := (Cost{}).Render(ctx); visible {
+		t.Error("cost widget visible in claude mode below overage; want hidden")
+	}
+}
+
+func TestCostHiddenWhenZeroInPiMode(t *testing.T) {
+	ctx := &Context{
+		Mode:   input.ModePi,
+		Status: input.Status{Cost: &input.Cost{TotalCostUSD: 0}},
+	}
+	if _, visible := (Cost{}).Render(ctx); visible {
+		t.Error("cost widget visible with zero cost; want hidden")
+	}
+}

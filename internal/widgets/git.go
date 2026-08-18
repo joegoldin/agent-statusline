@@ -54,7 +54,9 @@ func (Git) RenderSpans(ctx *Context) (render.Spans, bool) {
 		add(fmt.Sprintf("↓%d", g.Behind))
 	}
 	if wt := ctx.Status.Workspace.GitWorktree; wt != "" {
-		// nf-fa-tree (U+F1BB) inside the brackets to signal "worktree".
+		// U+E5FB inside the brackets to signal "worktree". Pinned by
+		// TestGitWidgetWorktreeGlyphIsPinned: no golden covers this branch,
+		// because the e2e harness runs outside a repo and hides the widget.
 		add("[ " + wt + "]")
 	}
 	return spans, true

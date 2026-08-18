@@ -49,6 +49,19 @@ func TestGitWidgetAppendsWorktree(t *testing.T) {
 	}
 }
 
+// TestGitWidgetWorktreeGlyphIsPinned guards a byte no golden can reach: the
+// e2e harness runs outside a git repository, so ctx.Git() is nil and the whole
+// widget is hidden. The glyph's own comment previously named U+F1BB while the
+// literal was U+E5FB, so retyping from the comment would have silently changed
+// what every worktree session renders.
+func TestGitWidgetWorktreeGlyphIsPinned(t *testing.T) {
+	out, _ := (&Git{}).Render(gitCtx(&gitcache.Git{Branch: "main"}, "wt"))
+	if !strings.Contains(out, "[\ue5fb wt]") {
+		t.Errorf("worktree badge glyph changed; got %q, want it to contain %q",
+			out, "[\ue5fb wt]")
+	}
+}
+
 func TestGitWidgetDetachedShowsSHA(t *testing.T) {
 	w := &Git{}
 	g := &gitcache.Git{Detached: true, SHA: "abcdef1234567890"}

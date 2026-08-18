@@ -40,7 +40,7 @@ func main() {
 		}
 	}()
 
-	// `claude-statusline hook` runs as a Claude Code tool hook (PermissionRequest
+	// `agent-statusline hook` runs as a Claude Code tool hook (PermissionRequest
 	// / PostToolUse / PostToolUseFailure), recording real tool start/end times to
 	// the per-session sidecar the statusline reads. Same binary so the sidecar
 	// format and cache path live in one place.
@@ -263,10 +263,10 @@ func memoize[T any](f func() T) func() T {
 
 func userCacheDir() string {
 	if d, err := os.UserCacheDir(); err == nil {
-		return filepath.Join(d, "claude-statusline")
+		return filepath.Join(d, "agent-statusline")
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".cache", "claude-statusline")
+	return filepath.Join(home, ".cache", "agent-statusline")
 }
 
 // toolHookInput is the subset of a PermissionRequest / PostToolUse /

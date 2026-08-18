@@ -21,6 +21,22 @@
         rec {
           agent-statusline = pkgs.callPackage ./package.nix { };
           default = agent-statusline;
+
+          # The pi extension. pi loads .ts directly, so this is a plain copy
+          # rather than a build. piEntrypoint is what pi-nix hands to
+          # --extension; keeping it in passthru means consumers never have to
+          # know the file layout.
+          pi-extension =
+            (pkgs.runCommand "agent-statusline-pi-extension" { } ''
+              mkdir -p $out
+              cp ${./extension/statusline.ts} $out/statusline.ts
+              cp ${./extension/package.json} $out/package.json
+            '').overrideAttrs
+              (old: {
+                passthru = (old.passthru or { }) // {
+                  piEntrypoint = "statusline.ts";
+                };
+              });
         }
       );
 

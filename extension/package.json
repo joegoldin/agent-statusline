@@ -1,0 +1,17 @@
+{
+  "name": "@joegoldin/agent-statusline-pi",
+  "version": "0.2.0",
+  "description": "pi extension that renders the agent-statusline footer",
+  "license": "MIT",
+  "type": "module",
+  "keywords": ["pi-package", "statusline"],
+  "pi": {
+    "extensions": ["./statusline.ts"]
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.9"
+  }
+}

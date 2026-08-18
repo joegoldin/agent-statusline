@@ -14,18 +14,23 @@ type Cost struct{}
 func (Cost) Name() string { return "cost" }
 
 func (Cost) Render(ctx *Context) (string, bool) {
+	spans, ok := Cost{}.RenderSpans(ctx)
+	return spans.ANSI(), ok
+}
+
+func (Cost) RenderSpans(ctx *Context) (render.Spans, bool) {
 	c := ctx.Status.Cost
 	if c == nil || c.TotalCostUSD <= 0 {
-		return "", false
+		return nil, false
 	}
 	// Claude Max subscribers don't pay for usage inside their plan limits, so
 	// in Claude mode cost only surfaces in overage territory. Under pi the auth
 	// is Codex / API key / OpenRouter, where every token is billed and cost is
 	// the primary meter — so it always shows.
 	if ctx.Mode != input.ModePi && !inOverage(ctx.Status.RateLimits) {
-		return "", false
+		return nil, false
 	}
-	return render.Red(fmt.Sprintf("%s$%.2f", costGlyph, c.TotalCostUSD)), true
+	return render.Spans{render.Text(render.IntentDanger, fmt.Sprintf("%s$%.2f", costGlyph, c.TotalCostUSD))}, true
 }
 
 // inOverage reports whether the user is *known* to be consuming overage

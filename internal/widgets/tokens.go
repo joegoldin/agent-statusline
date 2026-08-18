@@ -16,9 +16,14 @@ type Tokens struct{}
 func (Tokens) Name() string { return "tokens" }
 
 func (Tokens) Render(ctx *Context) (string, bool) {
+	spans, ok := Tokens{}.RenderSpans(ctx)
+	return spans.ANSI(), ok
+}
+
+func (Tokens) RenderSpans(ctx *Context) (render.Spans, bool) {
 	cw := ctx.Status.ContextWindow
 	if cw == nil {
-		return "", false
+		return nil, false
 	}
 	total := cw.TotalInputTokens
 	if total <= 0 && cw.CurrentUsage != nil {
@@ -27,7 +32,7 @@ func (Tokens) Render(ctx *Context) (string, bool) {
 			cw.CurrentUsage.CacheReadInputTokens
 	}
 	if total <= 0 {
-		return "", false
+		return nil, false
 	}
 	var formatted string
 	if strings.EqualFold(ctx.Cfg.TokenFormat, "raw") {
@@ -42,5 +47,5 @@ func (Tokens) Render(ctx *Context) (string, bool) {
 	if ctx.Compact() {
 		suffix = " tok"
 	}
-	return render.ThresholdColor5(pct)(formatted + suffix), true
+	return render.Spans{render.Text(render.ThresholdIntent5(pct), formatted+suffix)}, true
 }

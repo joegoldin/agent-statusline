@@ -14,12 +14,17 @@ type Duration struct{}
 func (Duration) Name() string { return "duration" }
 
 func (Duration) Render(ctx *Context) (string, bool) {
+	spans, ok := Duration{}.RenderSpans(ctx)
+	return spans.ANSI(), ok
+}
+
+func (Duration) RenderSpans(ctx *Context) (render.Spans, bool) {
 	c := ctx.Status.Cost
 	if c == nil || c.TotalDurationMS <= 0 {
-		return "", false
+		return nil, false
 	}
 	d := time.Duration(c.TotalDurationMS) * time.Millisecond
-	return render.Dim(durationGlyph + formatDurationCoarse(d)), true
+	return render.Spans{render.Text(render.IntentDim, durationGlyph+formatDurationCoarse(d))}, true
 }
 
 // formatDurationCoarse renders the session duration at minute granularity so

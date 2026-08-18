@@ -20,9 +20,14 @@ func (Model) Name() string { return "model" }
 var modelSuffixRE = regexp.MustCompile(`\s*\(1M context\)\s*$`)
 
 func (Model) Render(ctx *Context) (string, bool) {
+	spans, ok := Model{}.RenderSpans(ctx)
+	return spans.ANSI(), ok
+}
+
+func (Model) RenderSpans(ctx *Context) (render.Spans, bool) {
 	name := strings.TrimSpace(ctx.Status.Model.DisplayName)
 	if name == "" {
-		return "", false
+		return nil, false
 	}
 	name = modelSuffixRE.ReplaceAllString(name, "")
 	// Distinguish the 1M-context variant of a model — there are two
@@ -37,7 +42,7 @@ func (Model) Render(ctx *Context) (string, bool) {
 	if e := ctx.Status.Effort; e != nil && e.Level != "" {
 		out += " " + e.Level
 	}
-	return render.Cyan(out), true
+	return render.Spans{render.Text(render.IntentAccent, out)}, true
 }
 
 // is1MContext returns true when the active model is a 1M-context variant.

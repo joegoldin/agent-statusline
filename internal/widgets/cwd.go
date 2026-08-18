@@ -15,12 +15,17 @@ type CWD struct{}
 func (CWD) Name() string { return "cwd" }
 
 func (CWD) Render(ctx *Context) (string, bool) {
+	spans, ok := CWD{}.RenderSpans(ctx)
+	return spans.ANSI(), ok
+}
+
+func (CWD) RenderSpans(ctx *Context) (render.Spans, bool) {
 	path := ctx.Status.CWD
 	if path == "" {
 		path = ctx.Status.Workspace.CurrentDir
 	}
 	if path == "" {
-		return "", false
+		return nil, false
 	}
 	home, _ := os.UserHomeDir()
 	prefix := ""
@@ -29,7 +34,9 @@ func (CWD) Render(ctx *Context) (string, bool) {
 		path = strings.TrimPrefix(path, home)
 	}
 	path = lastNSegments(path, 2)
-	return render.Yellow(cwdGlyph + prefix + path), true
+	// IntentPath, not IntentWarn: the same SGR 33 under Claude Code, but pi
+	// renders a directory as a link rather than as an alarm.
+	return render.Spans{render.Text(render.IntentPath, cwdGlyph+prefix+path)}, true
 }
 
 // lastNSegments keeps only the last n segments of p (joined by separator),

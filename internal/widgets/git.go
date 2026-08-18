@@ -2,7 +2,6 @@ package widgets
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/joegoldin/agent-statusline/internal/render"
 )
@@ -14,9 +13,14 @@ type Git struct{}
 func (Git) Name() string { return "git" }
 
 func (Git) Render(ctx *Context) (string, bool) {
+	spans, ok := Git{}.RenderSpans(ctx)
+	return spans.ANSI(), ok
+}
+
+func (Git) RenderSpans(ctx *Context) (render.Spans, bool) {
 	g := ctx.Git()
 	if g == nil {
-		return "", false
+		return nil, false
 	}
 	var label string
 	switch {
@@ -29,21 +33,29 @@ func (Git) Render(ctx *Context) (string, bool) {
 	case g.Branch != "":
 		label = g.Branch
 	default:
-		return "", false
+		return nil, false
 	}
 	if g.Dirty {
 		label += "*"
 	}
-	parts := []string{render.Green(gitGlyph + label)}
+	spans := render.Spans{render.Text(render.IntentOK, gitGlyph+label)}
+	// The separators are spans of their own rather than part of the dim runs:
+	// under ANSI the concatenation is identical either way, but pi needs the
+	// colour boundaries to survive to the renderer.
+	add := func(s string) {
+		spans = append(spans,
+			render.Text(render.IntentText, " "),
+			render.Text(render.IntentDim, s))
+	}
 	if g.Ahead > 0 {
-		parts = append(parts, render.Dim(fmt.Sprintf("↑%d", g.Ahead)))
+		add(fmt.Sprintf("↑%d", g.Ahead))
 	}
 	if g.Behind > 0 {
-		parts = append(parts, render.Dim(fmt.Sprintf("↓%d", g.Behind)))
+		add(fmt.Sprintf("↓%d", g.Behind))
 	}
 	if wt := ctx.Status.Workspace.GitWorktree; wt != "" {
 		// nf-fa-tree (U+F1BB) inside the brackets to signal "worktree".
-		parts = append(parts, render.Dim("[ "+wt+"]"))
+		add("[ " + wt + "]")
 	}
-	return strings.Join(parts, " "), true
+	return spans, true
 }

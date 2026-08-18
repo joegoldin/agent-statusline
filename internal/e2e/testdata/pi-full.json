@@ -1,0 +1,18 @@
+{
+  "harness": "pi",
+  "cwd": "/tmp/agent-statusline-test-home/project",
+  "session_id": "pi-golden-1",
+  "session_name": "golden",
+  "session_path": "",
+  "model": {"id": "gpt-5.6-sol", "display_name": "Sol"},
+  "thinking_level": "xhigh",
+  "context": {
+    "window_size": 400000,
+    "input_tokens": 120000,
+    "output_tokens": 8000,
+    "cache_read_tokens": 90000,
+    "cache_creation_tokens": 4000
+  },
+  "cost_usd": 0.42,
+  "duration_ms": 330000
+}

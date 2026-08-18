@@ -15,13 +15,16 @@ var update = flag.Bool("update", false, "rewrite .golden files with current outp
 type fixture struct {
 	name  string
 	width string
+	mode  string // "" means no --mode flag, exercising autodetect
 }
 
 func TestGolden(t *testing.T) {
 	tests := []fixture{
-		{"idle", "80"},
-		{"full", "120"},
-		{"narrow", "40"},
+		{"idle", "80", ""},
+		{"full", "120", ""},
+		{"narrow", "40", ""},
+		{"pi-full", "120", ""},
+		{"pi-narrow", "40", ""},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -39,7 +42,11 @@ func runGolden(t *testing.T, tc fixture) {
 		t.Fatal(err)
 	}
 	binPath := buildBinary(t)
-	cmd := exec.Command(binPath)
+	args := []string{}
+	if tc.mode != "" {
+		args = append(args, "--mode", tc.mode)
+	}
+	cmd := exec.Command(binPath, args...)
 	cmd.Stdin = bytes.NewReader(stdin)
 	cmd.Env = append(os.Environ(),
 		"CLAUDE_STATUSLINE_WIDTH="+tc.width,

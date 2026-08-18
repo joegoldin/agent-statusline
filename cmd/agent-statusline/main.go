@@ -13,6 +13,7 @@ import (
 
 	"github.com/joegoldin/agent-statusline/internal/compaction"
 	"github.com/joegoldin/agent-statusline/internal/config"
+	"github.com/joegoldin/agent-statusline/internal/emit"
 	"github.com/joegoldin/agent-statusline/internal/gitcache"
 	"github.com/joegoldin/agent-statusline/internal/input"
 	"github.com/joegoldin/agent-statusline/internal/layout"
@@ -142,6 +143,25 @@ func main() {
 	})
 
 	registry := buildRegistry()
+
+	// --emit selects the OUTPUT encoding, orthogonally to --mode, which selects
+	// the INPUT decoder. Default "ansi" is today's behaviour byte for byte, so
+	// Claude Code and every existing invocation are unaffected.
+	switch flagValue("--emit") {
+	case "", "ansi":
+		// fall through to the ANSI renderer below
+	case "json":
+		// Width is deliberately not detected: the pi renderer is told the
+		// viewport width on every frame and would ignore ours anyway.
+		if err := emit.Write(os.Stdout, emit.Build(ctx, registry, dropPriority)); err != nil {
+			debugLog("emit.Write: %v", err)
+		}
+		return
+	default:
+		debugLog("unknown --emit %q (want ansi or json)", flagValue("--emit"))
+		os.Exit(0)
+	}
+
 	width := layout.DetectWidth()
 	ctx.Width = width
 

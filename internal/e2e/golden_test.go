@@ -16,18 +16,28 @@ type fixture struct {
 	name  string
 	width string
 	mode  string // "" means no --mode flag, exercising autodetect
+	emit  string // "" means the default ansi encoding
+}
+
+// goldenName distinguishes the two encodings of one input fixture.
+func (f fixture) goldenName() string {
+	if f.emit == "" || f.emit == "ansi" {
+		return f.name
+	}
+	return f.name + "." + f.emit
 }
 
 func TestGolden(t *testing.T) {
 	tests := []fixture{
-		{"idle", "80", ""},
-		{"full", "120", ""},
-		{"narrow", "40", ""},
-		{"pi-full", "120", ""},
-		{"pi-narrow", "40", ""},
+		{"idle", "80", "", ""},
+		{"full", "120", "", ""},
+		{"narrow", "40", "", ""},
+		{"pi-full", "120", "", ""},
+		{"pi-narrow", "40", "", ""},
+		{"pi-full", "120", "", "json"},
 	}
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.goldenName(), func(t *testing.T) {
 			runGolden(t, tc)
 		})
 	}
@@ -36,7 +46,7 @@ func TestGolden(t *testing.T) {
 func runGolden(t *testing.T, tc fixture) {
 	t.Helper()
 	stdinPath := filepath.Join("testdata", tc.name+".json")
-	goldenPath := filepath.Join("testdata", tc.name+".golden")
+	goldenPath := filepath.Join("testdata", tc.goldenName()+".golden")
 	stdin, err := os.ReadFile(stdinPath)
 	if err != nil {
 		t.Fatal(err)
@@ -45,6 +55,9 @@ func runGolden(t *testing.T, tc fixture) {
 	args := []string{}
 	if tc.mode != "" {
 		args = append(args, "--mode", tc.mode)
+	}
+	if tc.emit != "" {
+		args = append(args, "--emit", tc.emit)
 	}
 	cmd := exec.Command(binPath, args...)
 	cmd.Stdin = bytes.NewReader(stdin)

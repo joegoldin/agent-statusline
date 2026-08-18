@@ -110,3 +110,15 @@ func TestComposeRowOverflowDropsByPriority(t *testing.T) {
 		t.Errorf("high-priority segment missing: %q", out)
 	}
 }
+
+func TestSeparatorAndFlexNameMatchTheEmitter(t *testing.T) {
+	// internal/emit inlines these two literals because importing this package
+	// would cycle (layout already imports widgets, and emit imports both).
+	// Keep them in step here.
+	if want := "│"; !strings.Contains(Separator, want) {
+		t.Errorf("Separator = %q; update emit.separatorLiteral to match", Separator)
+	}
+	if FlexName != "flex" {
+		t.Errorf("FlexName = %q; update emit.flexNameLiteral to match", FlexName)
+	}
+}

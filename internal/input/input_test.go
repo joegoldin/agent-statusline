@@ -31,7 +31,7 @@ const sampleJSON = `{
 }`
 
 func TestDecode(t *testing.T) {
-	s, err := Decode(strings.NewReader(sampleJSON))
+	s, err := DecodeClaude(strings.NewReader(sampleJSON))
 	if err != nil {
 		t.Fatalf("Decode: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestDecode(t *testing.T) {
 
 func TestDecodeMissingOptionalFields(t *testing.T) {
 	minimal := `{"cwd":"/x","session_id":"s","model":{"display_name":"Opus"}}`
-	s, err := Decode(strings.NewReader(minimal))
+	s, err := DecodeClaude(strings.NewReader(minimal))
 	if err != nil {
 		t.Fatalf("Decode: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestDecodeMissingOptionalFields(t *testing.T) {
 }
 
 func TestDecodeMalformed(t *testing.T) {
-	if _, err := Decode(strings.NewReader("{garbage")); err == nil {
+	if _, err := DecodeClaude(strings.NewReader("{garbage")); err == nil {
 		t.Errorf("expected error for malformed JSON")
 	}
 }

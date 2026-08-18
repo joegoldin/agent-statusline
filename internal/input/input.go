@@ -88,8 +88,8 @@ type Vim struct {
 	Mode string `json:"mode"`
 }
 
-// Decode reads stdin JSON into a Status.
-func Decode(r io.Reader) (Status, error) {
+// DecodeClaude reads Claude Code's statusline stdin JSON into a Status.
+func DecodeClaude(r io.Reader) (Status, error) {
 	var s Status
 	dec := json.NewDecoder(r)
 	if err := dec.Decode(&s); err != nil {

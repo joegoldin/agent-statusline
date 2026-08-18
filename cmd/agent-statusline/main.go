@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -47,7 +49,22 @@ func main() {
 		return
 	}
 
-	status, err := input.Decode(os.Stdin)
+	mode, err := input.ParseMode(flagValue("--mode"))
+	if err != nil {
+		debugLog("ParseMode: %v", err)
+		os.Exit(0)
+	}
+
+	raw, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		debugLog("read stdin: %v", err)
+		os.Exit(0)
+	}
+	if mode == input.ModeAuto {
+		mode = input.Detect(raw)
+	}
+
+	status, err := input.Decode(bytes.NewReader(raw), mode)
 	if err != nil {
 		debugLog("input.Decode: %v", err)
 		os.Exit(0)
@@ -62,6 +79,7 @@ func main() {
 
 	ctx := &widgets.Context{
 		Status: status,
+		Mode:   mode,
 		Cfg:    cfg,
 		Now:    resolveNow(),
 	}
@@ -286,4 +304,20 @@ func debugLog(format string, args ...any) {
 	}
 	defer f.Close()
 	_, _ = fmt.Fprintf(f, time.Now().Format(time.RFC3339)+" "+format+"\n", args...)
+}
+
+// flagValue returns the value of a `--name value` or `--name=value` argument,
+// or "" when absent. Hand-rolled rather than using the flag package so the
+// `hook` subcommand keeps its own argument handling untouched.
+func flagValue(name string) string {
+	args := os.Args[1:]
+	for i, a := range args {
+		if a == name && i+1 < len(args) {
+			return args[i+1]
+		}
+		if strings.HasPrefix(a, name+"=") {
+			return strings.TrimPrefix(a, name+"=")
+		}
+	}
+	return ""
 }

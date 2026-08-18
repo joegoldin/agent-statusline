@@ -1,0 +1,6 @@
+# bun test discovers *.test.ts under the package root. The runtime extension
+# sources live in src/ and must stay import-free of node_modules, so tests are
+# kept beside them and nothing else is scanned.
+[test]
+root = "."
+coverageSkipTestFiles = true

@@ -1,7 +1,7 @@
 {
   "name": "@joegoldin/agent-statusline-pi",
-  "version": "0.2.0",
-  "description": "pi extension that renders the agent-statusline footer",
+  "version": "0.3.0",
+  "description": "pi extension that renders the agent-statusline dashboard natively",
   "license": "MIT",
   "type": "module",
   "keywords": ["pi-package", "statusline"],
@@ -10,5 +10,9 @@
   },
   "scripts": {
     "test": "bun test"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-tui": "0.84.2",
+    "@earendil-works/pi-coding-agent": "0.84.2"
   }
 }

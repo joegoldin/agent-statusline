@@ -2,7 +2,12 @@ import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, setDefaultTimeout } from "bun:test";
+
+// bun's per-test timeout defaults to 5s, which is below the waitFor deadline
+// below. A cold run — bun's first-run transpile plus the first subprocess
+// spawn — overshoots 5s and fails a test that is not actually slow.
+setDefaultTimeout(30_000);
 
 // bun:test has no vi.waitFor. Polls an assertion until it stops throwing,
 // which is all the two call sites below need.

@@ -1,0 +1,8 @@
+{
+  "cwd": "/tmp/claude-statusline-test-repo",
+  "session_id": "e2e-idle",
+  "transcript_path": "/tmp/claude-statusline-test-repo/idle.transcript.jsonl",
+  "model": {"id": "claude-opus-4-7", "display_name": "Opus"},
+  "context_window": {"context_window_size": 200000, "used_percentage": 12.0},
+  "cost": {"total_cost_usd": 0.05, "total_duration_ms": 45000}
+}

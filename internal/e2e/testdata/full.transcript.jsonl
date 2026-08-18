@@ -1,0 +1,4 @@
+{"type":"tool_use","id":"t1","name":"Read","status":"completed","timestamp":"2026-05-26T12:00:00Z"}
+{"type":"tool_use","id":"t2","name":"Read","status":"completed","timestamp":"2026-05-26T12:00:05Z"}
+{"type":"tool_use","id":"t3","name":"Edit","target":"home.nix","status":"in_progress","timestamp":"2026-05-26T12:00:10Z"}
+{"type":"todo_snapshot","timestamp":"2026-05-26T12:00:12Z","todos":[{"subject":"wire up","status":"completed"},{"subject":"write tests","status":"in_progress"},{"subject":"ship it","status":"pending"}]}

@@ -1,0 +1,15 @@
+{
+  "cwd": "/tmp/claude-statusline-test-repo",
+  "session_id": "e2e-full",
+  "transcript_path": "/tmp/claude-statusline-test-repo/full.transcript.jsonl",
+  "model": {"id": "claude-opus-4-7", "display_name": "Opus"},
+  "workspace": {"current_dir": "/tmp/claude-statusline-test-repo"},
+  "cost": {"total_cost_usd": 2.41, "total_duration_ms": 330000},
+  "context_window": {"context_window_size": 200000, "used_percentage": 73.5},
+  "rate_limits": {
+    "five_hour": {"used_percentage": 38.0, "resets_at": 1748271600},
+    "seven_day": {"used_percentage": 65.0, "resets_at": 1748764800}
+  },
+  "effort": {"level": "high"},
+  "pr": {"number": 42, "url": "https://example.com/pr/42", "review_state": "pending"}
+}

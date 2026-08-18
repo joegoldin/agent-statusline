@@ -37,13 +37,18 @@ type BurnRate struct{}
 func (BurnRate) Name() string { return "burnRate" }
 
 func (BurnRate) Render(ctx *Context) (string, bool) {
+	spans, ok := BurnRate{}.RenderSpans(ctx)
+	return spans.ANSI(), ok
+}
+
+func (BurnRate) RenderSpans(ctx *Context) (render.Spans, bool) {
 	entries := ctx.Transcript()
 	if entries == nil || len(entries.Requests) == 0 {
-		return "", false
+		return nil, false
 	}
 	size, ok := contextWindowSize(ctx.Status)
 	if !ok || size <= 0 {
-		return "", false
+		return nil, false
 	}
 	tau := time.Duration(ctx.Cfg.TranscriptWindowSeconds) * time.Second
 	if tau <= 0 {
@@ -51,37 +56,37 @@ func (BurnRate) Render(ctx *Context) (string, bool) {
 	}
 	tps := transcript.TokensPerSecondEMA(entries.Requests, burnNow(ctx.Now), tau)
 	if tps <= 0 {
-		return "", false
+		return nil, false
 	}
 	pctPerMin := tps * 60 / float64(size) * 100
 	// Below ~0.01 %/m the rate isn't actionable — most likely an idle
 	// session showing stale tail tokens. Hide the whole widget rather than
 	// invent obscure units. The burn-rate column will simply disappear.
 	if pctPerMin < 0.01 {
-		return "", false
+		return nil, false
 	}
-	rateStr := formatRate(pctPerMin)
-	left := fmt.Sprintf("%s %s", burnGlyph, rateStr)
+	spans := render.Spans{
+		render.Text(render.IntentMeta, fmt.Sprintf("%s %s", burnGlyph, formatRate(pctPerMin))),
+	}
 	// Compact terminal: drop the ETA tail so only the rate remains.
 	if ctx.Compact() {
-		return render.Magenta(left), true
+		return spans, true
 	}
-
 	pct, _ := contextPercent(ctx.Status)
 	eta := etaToFull(size, pct, tps)
 	// Only surface ETA when the projection is short enough to be meaningful.
 	// Anything beyond ~24h is closer to "indefinite" than a useful number.
 	const etaCap = 24 * time.Hour
 	if eta <= 0 || eta > etaCap {
-		return render.Magenta(left), true
+		return spans, true
 	}
-	etaStr := fmt.Sprintf("ETA %s", formatDuration(eta))
+	etaIntent := render.IntentDim
 	if eta < 15*time.Minute {
-		etaStr = render.Red(etaStr)
-	} else {
-		etaStr = render.Dim(etaStr)
+		etaIntent = render.IntentDanger
 	}
-	return render.Magenta(left) + " " + etaStr, true
+	return append(spans,
+		render.Text(render.IntentText, " "),
+		render.Text(etaIntent, "ETA "+formatDuration(eta))), true
 }
 
 // contextWindowSize returns the effective context window size, with the

@@ -15,10 +15,15 @@ type Usage5h struct{}
 func (Usage5h) Name() string { return "usage5h" }
 
 func (Usage5h) Render(ctx *Context) (string, bool) {
+	spans, ok := Usage5h{}.RenderSpans(ctx)
+	return spans.ANSI(), ok
+}
+
+func (Usage5h) RenderSpans(ctx *Context) (render.Spans, bool) {
 	if ctx.Status.RateLimits == nil || ctx.Status.RateLimits.FiveHour == nil {
-		return "", false
+		return nil, false
 	}
-	return renderUsageWindow(ctx, "5h", ctx.Status.RateLimits.FiveHour, 5*time.Hour, render.BlockStyle), true
+	return usageWindowSpans(ctx, "5h", ctx.Status.RateLimits.FiveHour, 5*time.Hour, render.BarBlock), true
 }
 
 type Usage7d struct{}
@@ -26,35 +31,48 @@ type Usage7d struct{}
 func (Usage7d) Name() string { return "usage7d" }
 
 func (Usage7d) Render(ctx *Context) (string, bool) {
-	if ctx.Status.RateLimits == nil || ctx.Status.RateLimits.SevenDay == nil {
-		return "", false
-	}
-	w := ctx.Status.RateLimits.SevenDay
-	threshold := float64(ctx.Cfg.SevenDayThreshold)
-	if threshold > 0 && w.UsedPercentage < threshold {
-		return "", false
-	}
-	return renderUsageWindow(ctx, "7d", w, 7*24*time.Hour, render.LineStyle), true
+	spans, ok := Usage7d{}.RenderSpans(ctx)
+	return spans.ANSI(), ok
 }
 
-func renderUsageWindow(ctx *Context, label string, w *input.Window, total time.Duration, style render.BarStyle) string {
-	color := render.ThresholdColor(w.UsedPercentage)
-	pct := color(fmt.Sprintf("%d%%", int(w.UsedPercentage+0.5)))
-	countdown := formatCountdown(ctx.Now, time.Unix(w.ResetsAt, 0))
-	pace := formatPace(ctx.Now, time.Unix(w.ResetsAt, 0), total, w.UsedPercentage)
-	var bar string
+func (Usage7d) RenderSpans(ctx *Context) (render.Spans, bool) {
+	if ctx.Status.RateLimits == nil || ctx.Status.RateLimits.SevenDay == nil {
+		return nil, false
+	}
+	w := ctx.Status.RateLimits.SevenDay
+	if threshold := float64(ctx.Cfg.SevenDayThreshold); threshold > 0 && w.UsedPercentage < threshold {
+		return nil, false
+	}
+	return usageWindowSpans(ctx, "7d", w, 7*24*time.Hour, render.BarLine), true
+}
+
+// usageWindowSpans mirrors the old renderUsageWindow exactly, one fmt segment
+// at a time. The single Sprintf is decomposed because each piece carries a
+// different intent: the label is plain, the percentage is threshold-coloured,
+// the countdown is metadata, the pace arrow is a judgement.
+func usageWindowSpans(ctx *Context, label string, w *input.Window, total time.Duration, style string) render.Spans {
+	intent := render.ThresholdIntent(w.UsedPercentage)
+	spans := render.Spans{render.Text(render.IntentText, usageGlyph+label+" ")}
 	if !ctx.Compact() {
 		width := ctx.Cfg.BarWidth
 		if width <= 0 {
 			width = 10
 		}
-		bar = render.GradientBar(w.UsedPercentage, width, style) + " "
+		spans = append(spans,
+			render.Bar(w.UsedPercentage/100, width, style),
+			render.Text(render.IntentText, " "))
 	}
-	out := fmt.Sprintf("%s%s %s%s (%s)", usageGlyph, label, bar, pct, render.Dim(countdown))
-	if pace != "" {
-		out += " " + pace
+	spans = append(spans,
+		render.Text(intent, fmt.Sprintf("%d%%", int(w.UsedPercentage+0.5))),
+		render.Text(render.IntentText, " ("),
+		render.Text(render.IntentDim, formatCountdown(ctx.Now, time.Unix(w.ResetsAt, 0))),
+		render.Text(render.IntentText, ")"))
+	if pace, paceIntent, ok := paceSpan(ctx.Now, time.Unix(w.ResetsAt, 0), total, w.UsedPercentage); ok {
+		spans = append(spans,
+			render.Text(render.IntentText, " "),
+			render.Text(paceIntent, pace))
 	}
-	return out
+	return spans
 }
 
 func formatCountdown(now, reset time.Time) string {
@@ -77,23 +95,24 @@ func formatCountdown(now, reset time.Time) string {
 	return fmt.Sprintf("%dm", int(d/time.Minute))
 }
 
-// formatPace renders ⇡ (over-consuming) / ⇣ (headroom) versus elapsed
-// fraction of the window. Returns "" when below significance threshold.
-func formatPace(now, reset time.Time, total time.Duration, usedPct float64) string {
+// paceSpan renders ⇡ (over-consuming) / ⇣ (headroom) versus elapsed
+// fraction of the window, split into its text and its intent. ok is false
+// below the significance threshold.
+func paceSpan(now, reset time.Time, total time.Duration, usedPct float64) (string, render.Intent, bool) {
 	if total <= 0 {
-		return ""
+		return "", "", false
 	}
 	elapsed := total - reset.Sub(now)
 	if elapsed <= 0 || elapsed > total {
-		return ""
+		return "", "", false
 	}
 	elapsedPct := float64(elapsed) / float64(total) * 100
 	delta := usedPct - elapsedPct
 	if delta > 2 {
-		return render.Red(fmt.Sprintf("⇡%d%%", int(delta+0.5)))
+		return fmt.Sprintf("⇡%d%%", int(delta+0.5)), render.IntentDanger, true
 	}
 	if delta < -2 {
-		return render.Green(fmt.Sprintf("⇣%d%%", int(-delta+0.5)))
+		return fmt.Sprintf("⇣%d%%", int(-delta+0.5)), render.IntentOK, true
 	}
-	return ""
+	return "", "", false
 }

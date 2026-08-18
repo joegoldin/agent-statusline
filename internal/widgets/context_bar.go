@@ -17,23 +17,37 @@ type ContextBar struct{}
 func (ContextBar) Name() string { return "context" }
 
 func (ContextBar) Render(ctx *Context) (string, bool) {
+	spans, ok := ContextBar{}.RenderSpans(ctx)
+	return spans.ANSI(), ok
+}
+
+func (ContextBar) RenderSpans(ctx *Context) (render.Spans, bool) {
 	pct, ok := contextPercent(ctx.Status)
 	if !ok {
-		return "", false
+		return nil, false
 	}
-	color := render.ThresholdColor5(pct)
-	pctStr := color(fmt.Sprintf("%d%%", int(pct+0.5)))
+	intent := render.ThresholdIntent5(pct)
+	pctText := fmt.Sprintf("%d%%", int(pct+0.5))
 	if ctx.Compact() {
-		return fmt.Sprintf("%s %s", color(contextGlyph), pctStr), true
+		return render.Spans{
+			render.Text(intent, contextGlyph),
+			render.Text(render.IntentText, " "),
+			render.Text(intent, pctText),
+		}, true
 	}
 	width := ctx.Cfg.BarWidth
 	if width <= 0 {
 		width = 10
 	}
-	// The bar paints a smooth per-cell rainbow; the glyph and percent text
-	// use the step palette so the alarm signal stays sharp.
-	bar := render.GradientBar(pct, width, render.BrailleStyle)
-	return fmt.Sprintf("%s%s %s", color(contextGlyph), bar, pctStr), true
+	// The bar paints a smooth per-cell ramp; the glyph and percent use the
+	// step palette so the alarm signal stays sharp. Only the fraction crosses
+	// the wire — the pi renderer re-derives the ramp from the active theme.
+	return render.Spans{
+		render.Text(intent, contextGlyph),
+		render.Bar(pct/100, width, render.BarBraille),
+		render.Text(render.IntentText, " "),
+		render.Text(intent, pctText),
+	}, true
 }
 
 // contextPercent computes the effective context percentage from Status,

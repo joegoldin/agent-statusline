@@ -8,6 +8,7 @@ import (
 	"github.com/joegoldin/agent-statusline/internal/gitcache"
 	"github.com/joegoldin/agent-statusline/internal/input"
 	"github.com/joegoldin/agent-statusline/internal/render"
+	"github.com/joegoldin/agent-statusline/internal/transcript"
 	"github.com/joegoldin/agent-statusline/internal/voice"
 )
 
@@ -18,6 +19,7 @@ func everySpanWidget() []Widget {
 	return []Widget{
 		Model{}, CWD{}, Git{}, Duration{}, Tokens{}, Voice{},
 		Compaction{}, PR{}, Cost{}, Effort{}, SessionName{},
+		ContextBar{}, Usage5h{}, Usage7d{}, BurnRate{},
 	}
 }
 
@@ -94,9 +96,74 @@ func fixtureContext(t *testing.T) *Context {
 				UsedPercentage:    &used,
 				TotalInputTokens:  214_000,
 			},
+			RateLimits: &input.RateLimits{
+				FiveHour: &input.Window{UsedPercentage: 62, ResetsAt: 1748260800 + 2*3600},
+				SevenDay: &input.Window{UsedPercentage: 71, ResetsAt: 1748260800 + 3*24*3600},
+			},
 		},
 		GitProvider:        func() *gitcache.Git { return &gitcache.Git{Branch: "main", Dirty: true, Ahead: 2, Behind: 1} },
 		VoiceProvider:      func() *voice.Config { return &voice.Config{Enabled: true, Mode: "dictate"} },
 		CompactionProvider: func() int { return 3 },
+		TranscriptProvider: func() *transcript.Entries {
+			base := time.Unix(1748260800, 0).UTC()
+			return &transcript.Entries{Requests: []transcript.Request{
+				{Timestamp: base.Add(-120 * time.Second), InputTokens: 40_000},
+				{Timestamp: base.Add(-30 * time.Second), InputTokens: 60_000},
+			}}
+		},
+	}
+}
+
+func TestSpansRoundTripInCompactMode(t *testing.T) {
+	ctx := fixtureContext(t)
+	ctx.Width = 40 // below DefaultCompactWidth, so Compact() is true
+	for _, w := range everySpanWidget() {
+		text, visible := SafeRender(w, ctx)
+		spans, spanVisible := SafeRenderSpans(w, ctx)
+		if visible != spanVisible {
+			t.Errorf("%s (compact): visible mismatch %v vs %v", w.Name(), visible, spanVisible)
+			continue
+		}
+		if got := spans.ANSI(); got != text {
+			t.Errorf("%s (compact): spans.ANSI() = %q, Render() = %q", w.Name(), got, text)
+		}
+	}
+}
+
+func TestContextBarEmitsAFillFractionNotAPercentage(t *testing.T) {
+	ctx := fixtureContext(t)
+	spans, ok := SafeRenderSpans(ContextBar{}, ctx)
+	if !ok {
+		t.Fatal("context widget hidden")
+	}
+	var bars int
+	for _, s := range spans {
+		if s.Kind != "bar" {
+			continue
+		}
+		bars++
+		if s.Fill < 0.534 || s.Fill > 0.536 {
+			t.Errorf("bar fill = %v, want ~0.535 (a fraction, not 53.5)", s.Fill)
+		}
+		if s.Cells != ctx.Cfg.BarWidth {
+			t.Errorf("bar cells = %d, want %d", s.Cells, ctx.Cfg.BarWidth)
+		}
+		if s.Style != render.BarBraille {
+			t.Errorf("bar style = %q, want %q", s.Style, render.BarBraille)
+		}
+	}
+	if bars != 1 {
+		t.Errorf("got %d bar spans, want exactly 1", bars)
+	}
+}
+
+func TestCompactContextDropsTheBar(t *testing.T) {
+	ctx := fixtureContext(t)
+	ctx.Width = 40
+	spans, _ := SafeRenderSpans(ContextBar{}, ctx)
+	for _, s := range spans {
+		if s.Kind == "bar" {
+			t.Fatal("compact context still emits a bar span")
+		}
 	}
 }

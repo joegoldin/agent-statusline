@@ -24,9 +24,13 @@
         }
       );
 
+      lib = forAllSystems ({ pkgs }: import ./lib { inherit pkgs; });
+
       checks = forAllSystems (
         { pkgs }:
         {
+          options-tests = import ./tests/options-test.nix { inherit pkgs; };
+
           agent-statusline-tests =
             pkgs.runCommand "agent-statusline-tests"
               {

@@ -57,6 +57,12 @@ const maxEntries = 256
 type Entry struct {
 	StartedAt time.Time `json:"started_at,omitempty"`
 	EndedAt   time.Time `json:"ended_at,omitempty"`
+	// Name and Target are populated only by harnesses with no transcript of
+	// their own. Claude Code leaves them empty because it joins tool names
+	// from the JSONL transcript by tool_use_id; pi has no such file, so its
+	// extension supplies them here and the sidecar becomes the row source.
+	Name   string `json:"name,omitempty"`
+	Target string `json:"target,omitempty"`
 }
 
 // sidecar is the on-disk shape: tool_use_id → Entry, wrapped so the schema can
@@ -216,4 +222,55 @@ func prune(sc *sidecar, now time.Time) {
 		kept[x.id] = sc.Tools[x.id]
 	}
 	sc.Tools = kept
+}
+
+// RecordStart stamps the beginning of a tool execution, carrying the tool's
+// name and target because the calling harness has no transcript to join
+// against. Empty identifiers are a no-op, matching Record.
+func RecordStart(cacheDir, sessionID, callID, name, target string, now time.Time) error {
+	return mutate(cacheDir, sessionID, callID, now, func(e *Entry) {
+		e.StartedAt = now
+		if name != "" {
+			e.Name = name
+		}
+		if target != "" {
+			e.Target = target
+		}
+	})
+}
+
+// RecordEnd stamps completion. As with Record, a missing start is backfilled
+// so a lost start event never strands a row as a perpetual hourglass.
+func RecordEnd(cacheDir, sessionID, callID string, now time.Time) error {
+	return mutate(cacheDir, sessionID, callID, now, func(e *Entry) {
+		e.EndedAt = now
+		if e.StartedAt.IsZero() {
+			e.StartedAt = now
+		}
+	})
+}
+
+// mutate runs fn against one entry under the sidecar lock, then prunes and
+// writes. Both Record and the Record{Start,End} pair funnel through here so
+// the on-disk format cannot diverge between harnesses.
+func mutate(cacheDir, sessionID, callID string, now time.Time, fn func(*Entry)) error {
+	if cacheDir == "" || sessionID == "" || callID == "" {
+		return nil
+	}
+	p := pathFor(cacheDir, sessionID)
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		return err
+	}
+	unlock, err := lock(p)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+
+	sc := read(p)
+	e := sc.Tools[callID]
+	fn(&e)
+	sc.Tools[callID] = e
+	prune(sc, now)
+	return write(p, sc)
 }

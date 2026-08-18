@@ -98,12 +98,18 @@ func main() {
 		return g
 	})
 	ctx.TranscriptProvider = memoize(func() *transcript.Entries {
-		if status.TranscriptPath == "" {
-			return &transcript.Entries{}
-		}
 		window := time.Duration(cfg.TranscriptWindowSeconds) * time.Second
 		if window <= 0 {
 			window = 300 * time.Second
+		}
+		// pi keeps no transcript the statusline can parse, so its tool rows
+		// come from the timing sidecar its extension writes.
+		if mode == input.ModePi {
+			return transcript.FromToolTiming(
+				toolclock.Load(cacheRoot, status.SessionID), ctx.Now, window)
+		}
+		if status.TranscriptPath == "" {
+			return &transcript.Entries{}
 		}
 		e, err := transcript.Load(
 			status.TranscriptPath,
@@ -282,6 +288,16 @@ func runToolHook() {
 		_ = recover()
 		os.Exit(0)
 	}()
+	// pi has no hook system, so its extension shells out to this same
+	// subcommand from its tool_execution_* handlers. It passes flags rather
+	// than stdin JSON, and supplies the tool name because pi keeps no
+	// transcript for the statusline to join against.
+	if flagValue("--mode") == string(input.ModePi) {
+		if err := recordPiToolEvent(userCacheDir(), parsePiHookArgs(), time.Now()); err != nil {
+			debugLog("pi hook: %v", err)
+		}
+		return
+	}
 	var h toolHookInput
 	if err := json.NewDecoder(os.Stdin).Decode(&h); err != nil {
 		debugLog("hook decode: %v", err)
@@ -320,4 +336,39 @@ func flagValue(name string) string {
 		}
 	}
 	return ""
+}
+
+// piHookArgs is the pi extension's tool-timing event.
+type piHookArgs struct {
+	SessionID string
+	ToolName  string
+	Target    string
+	CallID    string
+	Event     string // start | end | fail
+}
+
+func parsePiHookArgs() piHookArgs {
+	return piHookArgs{
+		SessionID: flagValue("--session"),
+		ToolName:  flagValue("--tool"),
+		Target:    flagValue("--target"),
+		CallID:    flagValue("--call-id"),
+		Event:     flagValue("--event"),
+	}
+}
+
+func recordPiToolEvent(cacheRoot string, a piHookArgs, now time.Time) error {
+	if a.SessionID == "" {
+		return fmt.Errorf("hook: --session is required")
+	}
+	if a.CallID == "" {
+		return fmt.Errorf("hook: --call-id is required")
+	}
+	switch a.Event {
+	case "start":
+		return toolclock.RecordStart(cacheRoot, a.SessionID, a.CallID, a.ToolName, a.Target, now)
+	case "end", "fail":
+		return toolclock.RecordEnd(cacheRoot, a.SessionID, a.CallID, now)
+	}
+	return fmt.Errorf("hook: unknown --event %q (want start, end, or fail)", a.Event)
 }

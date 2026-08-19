@@ -12,6 +12,28 @@ const snap = parseSnapshot(
   readFileSync(join(import.meta.dir, "..", "testdata", "snapshot-full.json"), "utf8"),
 ) as Snapshot;
 
+/**
+ * The two single-widget rows, injected rather than taken from the fixture, so
+ * these assertions describe the layout rule and not whichever widgets happened
+ * to be visible when snapshot-full.json was regenerated.
+ */
+function withExtraRows(base: Snapshot): Snapshot {
+  return {
+    ...base,
+    config: { ...base.config, row3: ["autoMode"], row4: ["cache"] },
+    widgets: {
+      ...base.widgets,
+      autoMode: { visible: true, spans: [{ kind: "text", intent: "ok", text: "auto \u25cf" }] },
+      cache: { visible: true, spans: [{ kind: "text", intent: "ok", text: "cache 79.3%" }] },
+    },
+  };
+}
+
+/** The same snapshot with both extra rows switched off in config. */
+function withoutExtraRows(base: Snapshot): Snapshot {
+  return { ...base, config: { ...base.config, row3: [], row4: [] } };
+}
+
 const NOW = 1748260800000;
 
 describe("composeRow", () => {
@@ -151,5 +173,31 @@ describe("renderRows", () => {
     const at0 = renderRows(snap, 120, theme, NOW).join("\n");
     const at7 = renderRows(snap, 120, theme, NOW + 7000).join("\n");
     expect(at7).not.toBe(at0);
+  });
+
+  it("draws row3 and row4 as extra lines under the dashboard", () => {
+    const { theme } = recordingTheme();
+    const rows = renderRows(withExtraRows(snap), 400, theme, NOW);
+    // Width 400 merges the dashboard onto one line, so the extra rows are the
+    // two immediately after it and the activity stack follows them.
+    expect(rows[1]).toContain("auto \u25cf");
+    expect(rows[2]).toContain("cache 79.3%");
+  });
+
+  it("costs no line when an extra row's widget is hidden", () => {
+    const { theme } = recordingTheme();
+    const withRows = withExtraRows(snap);
+    const hidden: Snapshot = {
+      ...withRows,
+      widgets: { ...withRows.widgets, autoMode: { visible: false }, cache: { visible: false } },
+    };
+    expect(renderRows(hidden, 400, theme, NOW)).toEqual(renderRows(withoutExtraRows(snap), 400, theme, NOW));
+  });
+
+  it("honours the hide list for the extra rows", () => {
+    const { theme } = recordingTheme();
+    const withRows = withExtraRows(snap);
+    const hidden: Snapshot = { ...withRows, config: { ...withRows.config, hide: ["autoMode", "cache"] } };
+    expect(renderRows(hidden, 400, theme, NOW)).toEqual(renderRows(withoutExtraRows(snap), 400, theme, NOW));
   });
 });

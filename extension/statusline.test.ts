@@ -26,6 +26,8 @@ async function waitFor(fn: () => unknown, timeoutMs = 10_000, stepMs = 10) {
 }
 
 import {
+  AUTO_MODE_STATUS_CHANNEL,
+  autoModeText,
   buildPayload,
   newSessionState,
   rateLimitsFromHeaders,
@@ -72,6 +74,22 @@ describe("buildPayload", () => {
     // pi's Model field is `name`; the wire field is `display_name`.
     expect(p.model).toEqual({ id: "gpt-5.6-sol", display_name: "Sol" });
     expect(p.thinking_level).toBe("xhigh");
+  });
+
+  it("carries the model's provider, which the cache sidecar keys on", () => {
+    const p = buildPayload({ ...ctx, model: { id: "gpt-5.6-sol", name: "Sol", provider: "openai-codex" } }, state(), 0);
+    expect(p.model).toEqual({ id: "gpt-5.6-sol", display_name: "Sol", provider: "openai-codex" });
+  });
+
+  it("puts the auto-mode status text on the wire verbatim", () => {
+    const p = buildPayload(ctx, state({ autoMode: "AM\u25cf a:105 d:4 ca:89 cd:4" }), 0);
+    expect(p.auto_mode).toBe("AM\u25cf a:105 d:4 ca:89 cd:4");
+  });
+
+  it("leaves auto_mode unset when nothing has been published", () => {
+    // Unset rather than empty: JSON.stringify drops it, and the entrypoint test
+    // below checks it never reaches the binary.
+    expect(buildPayload(ctx, state(), 0).auto_mode).toBeUndefined();
   });
 
   it("falls back to the model id when pi reports no display name", () => {
@@ -182,6 +200,27 @@ describe("buildPayload", () => {
   });
 });
 
+describe("autoModeText", () => {
+  // Envelope validation only. The strict parse of the text itself lives in Go,
+  // next to the widget that has to hide when it fails.
+  const cases: Array<[string, unknown, string | undefined]> = [
+    ["a published status", { text: "AM\u25cf a:105 d:4" }, "AM\u25cf a:105 d:4"],
+    ["the disabled circle", { text: "AM\u25cb a:0 d:0" }, "AM\u25cb a:0 d:0"],
+    ["a themed status", { text: "\x1b[36mAM\u25cf a:1 d:0\x1b[39m" }, "\x1b[36mAM\u25cf a:1 d:0\x1b[39m"],
+    ["auto mode clearing its slot", { text: "" }, undefined],
+    ["no text field", {}, undefined],
+    ["a non-string text", { text: 42 }, undefined],
+    ["a bare string instead of an envelope", "AM\u25cf a:1 d:0", undefined],
+    ["nothing at all", undefined, undefined],
+    ["null", null, undefined],
+  ];
+  for (const [name, data, want] of cases) {
+    it(`handles ${name}`, () => {
+      expect(autoModeText(data)).toBe(want as any);
+    });
+  }
+});
+
 describe("rateLimitsFromHeaders", () => {
   it("returns undefined when the provider sent no unified headers", () => {
     expect(rateLimitsFromHeaders(undefined)).toBeUndefined();
@@ -268,12 +307,25 @@ describe("extension entrypoint", () => {
   // pi's, to prove the event wiring and the exec plumbing hold together.
   function fakePi() {
     const handlers = new Map<string, Function>();
+    const busHandlers = new Map<string, Function>();
     const execCalls: Array<{ command: string; args: string[] }> = [];
     return {
       handlers,
+      busHandlers,
       execCalls,
       on(event: string, handler: Function) {
         handlers.set(event, handler);
+      },
+      // pi.events is the shared bus other extensions publish on. Its `on`
+      // returns the unsubscribe, which is how this one detaches at shutdown.
+      events: {
+        on(channel: string, handler: Function) {
+          busHandlers.set(channel, handler);
+          return () => busHandlers.delete(channel);
+        },
+        emit(channel: string, data: unknown) {
+          busHandlers.get(channel)?.(data);
+        },
       },
       exec(command: string, args: string[]) {
         execCalls.push({ command, args });
@@ -371,6 +423,37 @@ describe("extension entrypoint", () => {
       expect(wire.session_name).toBe("fork-the-flake");
       expect(wire.model).toEqual({ id: "gpt-5.6-sol", display_name: "Sol" });
       expect(wire.thinking_level).toBe("high");
+    } finally {
+      delete process.env.AGENT_STATUSLINE_BIN;
+    }
+  });
+
+  it("takes the auto-mode tally off pi's event bus", async () => {
+    const bin = recordingBinary();
+    process.env.AGENT_STATUSLINE_BIN = bin.path;
+    try {
+      const { default: register } = await import("./statusline");
+      const pi = fakePi();
+      register(pi);
+      const { ctx } = fakeCtx();
+      await pi.emit("session_start", { type: "session_start", reason: "startup" }, ctx);
+      await waitFor(() => expect(bin.payloads().length).toBe(1));
+      expect(pi.busHandlers.has(AUTO_MODE_STATUS_CHANNEL)).toBe(true);
+
+      pi.events.emit(AUTO_MODE_STATUS_CHANNEL, { text: "AM\u25cf a:105 d:4 ca:89 cd:4" });
+      await waitFor(() => {
+        expect(bin.payloads().at(-1).auto_mode).toBe("AM\u25cf a:105 d:4 ca:89 cd:4");
+      });
+
+      // The tally is not session state: once auto mode stops publishing, the
+      // widget has to go away rather than freeze on the last count.
+      pi.events.emit(AUTO_MODE_STATUS_CHANNEL, { text: "" });
+      await waitFor(() => {
+        expect(bin.payloads().at(-1)).not.toHaveProperty("auto_mode");
+      });
+
+      await pi.emit("session_shutdown", { type: "session_shutdown" }, ctx);
+      expect(pi.busHandlers.has(AUTO_MODE_STATUS_CHANNEL)).toBe(false);
     } finally {
       delete process.env.AGENT_STATUSLINE_BIN;
     }

@@ -48,6 +48,8 @@ export interface SnapshotConfig {
   flexName: string;
   row1: string[];
   row2: string[];
+  row3: string[];
+  row4: string[];
   hide: string[];
   dropPriority: string[];
 }

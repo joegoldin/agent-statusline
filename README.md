@@ -66,10 +66,15 @@ H=$(mktemp -d) && mkdir -p "$H/.cache/agent-statusline/tool-timing"
 # timestamps are offsets from 1748260800, then:
 CLAUDE_STATUSLINE_NOW=1748260800 CLAUDE_STATUSLINE_CONFIG=/dev/null \
   HOME=$H XDG_CACHE_HOME=$H/.cache \
+  PI_CODING_AGENT_DIR=$PWD/internal/e2e/testdata/pi-agent \
   ./agent-statusline --emit json < internal/e2e/testdata/pi-full.json \
   > extension/testdata/snapshot-full.json
 cd extension && UPDATE_GOLDEN=1 bun test src/rows.test.ts
 ```
+
+`PI_CODING_AGENT_DIR` matters for the same reason: the cache row reads pi's
+state directory, and pointing it at the checked-in fixture is what keeps that
+row out of whatever the machine running the tests has cached.
 
 `XDG_CACHE_HOME` matters as much as `HOME`: `os.UserCacheDir` prefers it, so
 setting only `HOME` reads your real cache and the output stops being

@@ -182,9 +182,12 @@ describe("pi widget render contract", () => {
 
   it("emits runs of spaces that the sink would collapse, at the width pi uses", () => {
     // Even without a flex spacer the rows carry padding the sanitiser eats —
-    // this is the assertion that would still fail if flex were removed.
+    // this is the assertion that would still fail if flex were removed. The
+    // runs come from the activity stack's "  ·  " joins, so this is measured at
+    // a width whose line budget still reaches those rows: with four configured
+    // widget rows, 40 cells is dashboard all the way down.
     const { theme } = recordingTheme();
-    const joined = renderRows(snap, 40, theme, NOW).join("\n");
+    const joined = renderRows(snap, 120, theme, NOW).join("\n");
     expect(/ {2,}/.test(joined)).toBe(true);
     expect(sanitizeStatusText(joined)).not.toBe(joined);
   });

@@ -49,6 +49,11 @@ export interface PiModel {
   contextWindow?: number;
 }
 
+/** pi's shared event bus, the channel other extensions publish on. */
+export interface PiEventBus {
+  on(channel: string, handler: (data: unknown) => void): () => void;
+}
+
 /** The slice of `ExtensionContext` this extension reads. */
 export interface PiExtensionContext {
   cwd?: string;
@@ -94,8 +99,13 @@ export interface PiPayload {
   session_name?: string;
   session_path?: string;
   project_dir?: string;
-  model?: { id: string; display_name: string };
+  model?: { id: string; display_name: string; provider?: string };
   thinking_level?: string;
+  /**
+   * The pi-automode extension's status text, verbatim. Parsed in Go, where the
+   * widget can hide on a format change instead of rendering a wrong tally.
+   */
+  auto_mode?: string;
   context?: PiPayloadContext;
   cost_usd?: number;
   duration_ms: number;
@@ -117,6 +127,8 @@ export interface SessionState {
   lastUsage?: PiUsage;
   rateLimits?: RateLimits;
   version?: string;
+  /** Last status text auto mode published, or undefined once it stops. */
+  autoMode?: string;
 }
 
 export function newSessionState(now = Date.now()): SessionState {
@@ -154,11 +166,18 @@ export function buildPayload(
     cost_usd: state.costUsd > 0 ? state.costUsd : undefined,
     rate_limits: state.rateLimits,
     version: state.version,
+    auto_mode: state.autoMode,
   };
 
-  // pi-ai Model exposes `name`, not `displayName`.
+  // pi-ai Model exposes `name`, not `displayName`. The provider rides along
+  // because a model id alone does not identify a model to the cache-optimizer
+  // sidecar the Go side reads, which keys on "provider/id".
   if (ctx?.model?.id) {
-    payload.model = { id: ctx.model.id, display_name: ctx.model.name ?? ctx.model.id };
+    payload.model = {
+      id: ctx.model.id,
+      display_name: ctx.model.name ?? ctx.model.id,
+      provider: ctx.model.provider,
+    };
   }
   if (ctx?.thinkingLevel) {
     payload.thinking_level = ctx.thinkingLevel;
@@ -227,6 +246,28 @@ export function rateLimitsFromHeaders(headers: Record<string, string> | undefine
     out[field] = { used_percentage: pct, resets_at: Number.isFinite(reset) ? reset : 0 };
   }
   return out;
+}
+
+/**
+ * The channel auto mode republishes its status text on, from
+ * extensions/auto-mode/permission-chain.ts. It only publishes when it has been
+ * told not to draw its own status slot (PI_AUTOMODE_NO_STATUS_SLOT=1);
+ * otherwise the text stays in pi's footer and this extension re-renders it
+ * there like any other extension's status line.
+ */
+export const AUTO_MODE_STATUS_CHANNEL = "pi-automode:status";
+
+/**
+ * Validate one `{ text }` envelope off that channel.
+ *
+ * Envelope only: the text itself is parsed in Go, next to the widget that has
+ * to hide when the format moves. An empty text is auto mode clearing its slot,
+ * so it clears ours too rather than freezing the last tally on screen.
+ */
+export function autoModeText(data: unknown): string | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const text = (data as { text?: unknown }).text;
+  return typeof text === "string" && text !== "" ? text : undefined;
 }
 
 /** The bits of a session entry this extension cares about. */
@@ -357,6 +398,22 @@ export default function (pi: any) {
   let poll: ReturnType<typeof setInterval> | undefined;
   let inFlight = false;
   let pendingRefresh = false;
+  // The bus hands its subscriber only the published data, so the context a
+  // refresh needs has to be remembered from the last event that carried one.
+  let lastCtx: PiExtensionContext | undefined;
+
+  // Subscribed at load rather than at session_start, so a tally published
+  // before the first frame is still on the next payload. An older pi with no
+  // event bus simply leaves the widget hidden.
+  let unsubscribeAutoMode: (() => void) | undefined;
+  try {
+    unsubscribeAutoMode = pi.events?.on?.(AUTO_MODE_STATUS_CHANNEL, (data: unknown) => {
+      state.autoMode = autoModeText(data);
+      if (lastCtx) void refresh(lastCtx);
+    });
+  } catch {
+    // A bus that refuses subscribers costs one widget, never the statusline.
+  }
 
   const syncSession = (ctx: PiExtensionContext) => {
     const sm = ctx?.sessionManager;
@@ -447,6 +504,7 @@ export default function (pi: any) {
   pi.on("tool_execution_end", (e: any) => toolEvent(e, e?.isError ? "fail" : "end"));
 
   function install(ctx: PiExtensionContext) {
+    lastCtx = ctx;
     handle?.dispose();
     // onDataStale fires on a branch change, which pi already watches and
     // debounces for us — cheaper and more responsive than polling git.
@@ -457,6 +515,8 @@ export default function (pi: any) {
   }
 
   function teardown() {
+    unsubscribeAutoMode?.();
+    unsubscribeAutoMode = undefined;
     if (poll) clearInterval(poll);
     poll = undefined;
     handle?.dispose();
@@ -466,6 +526,7 @@ export default function (pi: any) {
   pi.on("session_shutdown", () => teardown());
 
   async function refresh(ctx: PiExtensionContext) {
+    lastCtx = ctx;
     // One binary at a time, but never a dropped update: a refresh that arrives
     // mid-flight is coalesced and re-run at the end, so the frame on screen
     // always reflects the last event rather than whichever one won a race.

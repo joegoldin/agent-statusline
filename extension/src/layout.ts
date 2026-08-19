@@ -188,6 +188,12 @@ export function renderRows(
       ...wrapRow(cfg.row2 ?? [], snap, width, theme),
     ];
   }
+  // Rows 3 and 4 are extra lines rather than dashboard columns: each carries a
+  // single widget that draws several figures of its own. They wrap like the
+  // dashboard and cost nothing when their widget hides.
+  for (const names of [cfg.row3 ?? [], cfg.row4 ?? []]) {
+    dashboard.push(...wrapRow(names, snap, width, theme));
+  }
   dashboard = dashboard.filter((l) => l.trim().length > 0).slice(0, maxLines);
 
   const budget = Math.min(maxLines - dashboard.length, cfg.activityRows ?? 0);

@@ -25,6 +25,10 @@ type PiStatus struct {
 	RateLimits    *RateLimits `json:"rate_limits"`
 	PR            *PR         `json:"pr"`
 	Version       string      `json:"version"`
+	// AutoMode is the pi-automode extension's status text as it was
+	// republished on its event bus channel. Empty when that extension is not
+	// installed, or is still drawing its own status slot.
+	AutoMode string `json:"auto_mode"`
 }
 
 // PiContext is pi's raw token accounting. Percentages are deliberately absent:
@@ -63,6 +67,7 @@ func DecodePi(r io.Reader) (Status, error) {
 		},
 		RateLimits: p.RateLimits,
 		PR:         p.PR,
+		AutoMode:   p.AutoMode,
 	}
 
 	if p.ThinkingLevel != "" {

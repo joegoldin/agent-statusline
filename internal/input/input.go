@@ -22,11 +22,19 @@ type Status struct {
 	PR             *PR            `json:"pr"`
 	Worktree       *WorktreeInfo  `json:"worktree"`
 	Vim            *Vim           `json:"vim"`
+	// AutoMode is the pi-automode extension's status text, verbatim. It is
+	// carried unparsed because the parse belongs next to the widget that has
+	// to hide when it fails; Claude Code never sets it.
+	AutoMode string `json:"auto_mode"`
 }
 
 type Model struct {
 	ID          string `json:"id"`
 	DisplayName string `json:"display_name"`
+	// Provider is pi's model namespace ("openai-codex", "anthropic"). Claude
+	// Code sends no such field; it is here because a model id alone does not
+	// identify a model to the cache-optimizer sidecar, which keys on both.
+	Provider string `json:"provider"`
 }
 
 type Workspace struct {

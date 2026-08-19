@@ -126,3 +126,23 @@ func TestDecodePiPassesThroughRateLimits(t *testing.T) {
 		t.Errorf("FiveHour.UsedPercentage = %v", s.RateLimits.FiveHour.UsedPercentage)
 	}
 }
+
+func TestDecodePiCarriesAutoModeAndProviderThrough(t *testing.T) {
+	const raw = `{
+  "harness": "pi",
+  "model": {"id": "gpt-5.6-sol", "display_name": "Sol", "provider": "openai-codex"},
+  "auto_mode": "AM● a:105 d:4 ca:89 cd:4"
+}`
+	s, err := DecodePi(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("DecodePi: %v", err)
+	}
+	if s.Model.Provider != "openai-codex" {
+		t.Errorf("Model.Provider = %q, want %q", s.Model.Provider, "openai-codex")
+	}
+	// Verbatim: the widget owns the parse, and anything trimmed here would be
+	// trimmed somewhere the strict regex cannot see.
+	if want := "AM● a:105 d:4 ca:89 cd:4"; s.AutoMode != want {
+		t.Errorf("AutoMode = %q, want %q", s.AutoMode, want)
+	}
+}

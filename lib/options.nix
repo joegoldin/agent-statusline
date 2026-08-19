@@ -18,10 +18,10 @@
 let
   inherit (lib) mkOption types;
 
-  # Every widget the binary can place on row1/row2. Derived from the registry
+  # Every widget the binary can place on a row. Derived from the registry
   # built in cmd/agent-statusline/main.go (`buildRegistry`) — i.e. each
   # widget's `Name()` — and cross-checked against `dropPriority` in the same
-  # file, which lists exactly the same fifteen names.
+  # file, which lists exactly the same seventeen names.
   #
   # The activity-stack widgets (tools, toolsRecent, agents, todos) are
   # deliberately absent: they are a fixed, non-configurable stack sized by
@@ -43,6 +43,8 @@ let
     "pr"
     "cost"
     "sessionName"
+    "autoMode"
+    "cache"
   ];
 in
 {
@@ -139,6 +141,27 @@ in
             "cost"
           ];
           description = "Bottom row — this conversation's state.";
+        };
+        row3 = mkOption {
+          type = types.listOf (types.enum widgetNames);
+          default = [ "autoMode" ];
+          description = ''
+            Third row — the pi-automode permission tally. Rendered on a
+            line of its own because the widget draws several figures.
+            Empty to switch the row off; it hides itself anyway unless
+            pi-automode is publishing its status text, which it only does
+            with `PI_AUTOMODE_NO_STATUS_SLOT = "1"` in the environment.
+          '';
+        };
+        row4 = mkOption {
+          type = types.listOf (types.enum widgetNames);
+          default = [ "cache" ];
+          description = ''
+            Fourth row — prompt-cache hit rate for the active model, read
+            from the pi cache-optimizer extension's sidecar in
+            `$PI_CODING_AGENT_DIR`. Empty to switch the row off; it hides
+            itself when that extension has recorded nothing for the model.
+          '';
         };
         hide = mkOption {
           type = types.listOf (types.enum widgetNames);

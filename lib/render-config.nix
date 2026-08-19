@@ -25,7 +25,13 @@ pkgs.writeText "agent-statusline-config.json" (
       tokenFormat
       ;
     widgets = {
-      inherit (cfg.widgets) row1 row2 hide;
+      inherit (cfg.widgets)
+        row1
+        row2
+        row3
+        row4
+        hide
+        ;
     };
   }
 )

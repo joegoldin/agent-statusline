@@ -6,6 +6,13 @@ package widgets
 
 import "github.com/joegoldin/agent-statusline/internal/render"
 
+// rowSeparator duplicates internal/layout.Separator, which widgets cannot
+// import without a cycle (layout imports widgets). A widget that draws several
+// independent figures on one row uses the same divider the layout puts between
+// widgets, so a row reads as one line rather than two conventions.
+// TestSeparatorAndFlexNameMatchTheEmitter in internal/layout pins the literal.
+const rowSeparator = " │ "
+
 // Widget is the contract every dashboard segment implements.
 type Widget interface {
 	// Name is the lowercase identifier used in config (e.g. "model", "cwd").

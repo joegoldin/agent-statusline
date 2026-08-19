@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/joegoldin/agent-statusline/internal/input"
 	"github.com/joegoldin/agent-statusline/internal/render"
 	"github.com/joegoldin/agent-statusline/internal/widgets"
 )
@@ -120,5 +121,20 @@ func TestSeparatorAndFlexNameMatchTheEmitter(t *testing.T) {
 	}
 	if FlexName != "flex" {
 		t.Errorf("FlexName = %q; update emit.flexNameLiteral to match", FlexName)
+	}
+}
+
+func TestWidgetInlineSeparatorMatchesTheRowSeparator(t *testing.T) {
+	// internal/widgets inlines this same literal for the widgets that draw
+	// several figures on one row, because importing this package there would
+	// cycle. Pinned through real output rather than through the constant, which
+	// is unexported on purpose.
+	ctx := &widgets.Context{Status: input.Status{AutoMode: "AM● a:2 d:0"}}
+	out, ok := widgets.SafeRender(widgets.AutoMode{}, ctx)
+	if !ok {
+		t.Fatal("autoMode widget hidden; the fixture no longer parses")
+	}
+	if !strings.Contains(out, Separator) {
+		t.Errorf("widget drew %q, which contains no %q: widgets.rowSeparator has drifted", out, Separator)
 	}
 }

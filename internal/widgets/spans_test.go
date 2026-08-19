@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/joegoldin/agent-statusline/internal/cachestats"
 	"github.com/joegoldin/agent-statusline/internal/config"
 	"github.com/joegoldin/agent-statusline/internal/gitcache"
 	"github.com/joegoldin/agent-statusline/internal/input"
@@ -20,6 +21,7 @@ func everySpanWidget() []Widget {
 		Model{}, CWD{}, Git{}, Duration{}, Tokens{}, Voice{},
 		Compaction{}, PR{}, Cost{}, Effort{}, SessionName{},
 		ContextBar{}, Usage5h{}, Usage7d{}, BurnRate{},
+		AutoMode{}, Cache{},
 	}
 }
 
@@ -86,7 +88,8 @@ func fixtureContext(t *testing.T) *Context {
 		Status: input.Status{
 			CWD:         "/home/joe/Development/agent-statusline",
 			SessionName: "native-pi",
-			Model:       input.Model{ID: "gpt-5.6-sol", DisplayName: "Sol"},
+			Model:       input.Model{ID: "gpt-5.6-sol", DisplayName: "Sol", Provider: "openai-codex"},
+			AutoMode:    "AM● a:105 d:4 ca:89 cd:4",
 			Workspace:   input.Workspace{GitWorktree: "feature"},
 			Effort:      &input.Effort{Level: "xhigh"},
 			Cost:        &input.Cost{TotalCostUSD: 4.20, TotalDurationMS: 4_530_000},
@@ -100,6 +103,16 @@ func fixtureContext(t *testing.T) *Context {
 				FiveHour: &input.Window{UsedPercentage: 62, ResetsAt: 1748260800 + 2*3600},
 				SevenDay: &input.Window{UsedPercentage: 71, ResetsAt: 1748260800 + 3*24*3600},
 			},
+		},
+		CacheStatsProvider: func() *cachestats.Stats {
+			return &cachestats.Stats{TotalsByModel: map[string]cachestats.Totals{
+				"openai-codex/gpt-5.6-sol": {
+					TotalRequests:     41,
+					HitRequests:       35,
+					CachedInputTokens: 1_690_000,
+					TotalInputTokens:  2_130_000,
+				},
+			}}
 		},
 		GitProvider:        func() *gitcache.Git { return &gitcache.Git{Branch: "main", Dirty: true, Ahead: 2, Behind: 1} },
 		VoiceProvider:      func() *voice.Config { return &voice.Config{Enabled: true, Mode: "dictate"} },

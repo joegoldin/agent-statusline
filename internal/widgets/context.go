@@ -3,6 +3,7 @@ package widgets
 import (
 	"time"
 
+	"github.com/joegoldin/agent-statusline/internal/cachestats"
 	"github.com/joegoldin/agent-statusline/internal/config"
 	"github.com/joegoldin/agent-statusline/internal/gitcache"
 	"github.com/joegoldin/agent-statusline/internal/input"
@@ -42,6 +43,10 @@ type Context struct {
 	// the running-tools row to distinguish waiting from running and to show
 	// accurate elapsed. Nil/empty when hooks aren't installed.
 	ToolTimingProvider func() map[string]toolclock.Entry
+	// CacheStatsProvider yields the prompt-cache accounting the pi
+	// cache-optimizer extension persists. Nil when that extension has never
+	// run or its sidecar is unreadable, which hides the cache widget.
+	CacheStatsProvider func() *cachestats.Stats
 }
 
 // Compact reports whether widgets should emit shortened forms (drop bars,
@@ -85,6 +90,13 @@ func (c *Context) Compactions() int {
 		return 0
 	}
 	return c.CompactionProvider()
+}
+
+func (c *Context) CacheStats() *cachestats.Stats {
+	if c.CacheStatsProvider == nil {
+		return nil
+	}
+	return c.CacheStatsProvider()
 }
 
 func (c *Context) ToolTiming() map[string]toolclock.Entry {

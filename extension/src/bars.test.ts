@@ -5,15 +5,18 @@ import { recordingTheme } from "./testing";
 import { visibleWidth } from "./width";
 
 describe("renderBar", () => {
-  it("is exactly `cells` columns wide at every fill", () => {
-    const { theme } = recordingTheme();
-    for (const fill of [0, 0.01, 0.25, 0.5, 0.535, 0.99, 1]) {
-      for (const style of ["braille", "block", "line"] as const) {
-        expect([fill, style, visibleWidth(renderBar(fill, 10, style, theme))]).toEqual([
-          fill,
-          style,
-          10,
-        ]);
+  it("is exactly `cells` columns wide at every fill, in both colour modes", () => {
+    for (const colorMode of ["truecolor", "256color"] as const) {
+      const { theme } = recordingTheme({ colorMode });
+      for (const fill of [0, 0.01, 0.25, 0.5, 0.535, 0.99, 1]) {
+        for (const style of ["braille", "block", "line"] as const) {
+          expect([colorMode, fill, style, visibleWidth(renderBar(fill, 10, style, theme))]).toEqual([
+            colorMode,
+            fill,
+            style,
+            10,
+          ]);
+        }
       }
     }
   });

@@ -82,14 +82,17 @@ describe("paint", () => {
       { kind: "text", text: "60%", intent: "caution" },
     ];
     const out = paint(spans, rec.theme, cfg);
-    expect(out).not.toMatch(/\x1b\[3[0-9]m/);
+    // The basic-colour SGRs the old Go path hardcoded: 30-37 and their bright
+    // twins. 39 is the foreground reset the theme itself closes with, which is
+    // structure rather than colour, so it is deliberately not in this set.
+    expect(out).not.toMatch(/\x1b\[(?:3[0-7]|9[0-7])m/);
     expect(rec.tokens().sort()).toEqual(["success", "text", "warning"]);
   });
 
   it("bolds the caution intent", () => {
     const rec = recordingTheme();
     const out = paint([{ kind: "text", text: "60%", intent: "caution" }], rec.theme, cfg);
-    expect(out).toContain("<b>");
+    expect(out).toContain("\x1b[1m");
   });
 
   it("treats a missing intent as text rather than dropping the span", () => {

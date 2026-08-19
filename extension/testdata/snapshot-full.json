@@ -1,0 +1,226 @@
+{
+  "schema": 1,
+  "mode": "pi",
+  "asOfMs": 1748260800000,
+  "config": {
+    "barWidth": 10,
+    "compactWidth": 70,
+    "activityRows": 4,
+    "hideWhenIdle": true,
+    "padding": 0,
+    "refreshIntervalMs": 1000,
+    "maxLines": 6,
+    "separator": " │ ",
+    "flexName": "flex",
+    "row1": [
+      "model",
+      "cwd",
+      "git",
+      "duration",
+      "usage5h",
+      "usage7d"
+    ],
+    "row2": [
+      "context",
+      "tokens",
+      "burnRate",
+      "voice",
+      "compaction",
+      "pr",
+      "cost"
+    ],
+    "hide": [],
+    "dropPriority": [
+      "sessionName",
+      "compaction",
+      "pr",
+      "voice",
+      "cost",
+      "burnRate",
+      "duration",
+      "tokens",
+      "effort",
+      "context",
+      "usage7d",
+      "usage5h",
+      "git",
+      "cwd",
+      "model"
+    ]
+  },
+  "widgets": {
+    "burnRate": {
+      "visible": false
+    },
+    "compaction": {
+      "visible": false
+    },
+    "context": {
+      "visible": true,
+      "spans": [
+        {
+          "kind": "text",
+          "text": " ",
+          "intent": "warn"
+        },
+        {
+          "kind": "bar",
+          "fill": 0.535,
+          "cells": 10,
+          "style": "braille"
+        },
+        {
+          "kind": "text",
+          "text": " ",
+          "intent": "text"
+        },
+        {
+          "kind": "text",
+          "text": "54%",
+          "intent": "warn"
+        }
+      ],
+      "compact": [
+        {
+          "kind": "text",
+          "text": " ",
+          "intent": "warn"
+        },
+        {
+          "kind": "text",
+          "text": " ",
+          "intent": "text"
+        },
+        {
+          "kind": "text",
+          "text": "54%",
+          "intent": "warn"
+        }
+      ]
+    },
+    "cost": {
+      "visible": true,
+      "spans": [
+        {
+          "kind": "text",
+          "text": " $0.42",
+          "intent": "danger"
+        }
+      ]
+    },
+    "cwd": {
+      "visible": true,
+      "spans": [
+        {
+          "kind": "text",
+          "text": " /.../agent-statusline-test-home/project",
+          "intent": "path"
+        }
+      ]
+    },
+    "duration": {
+      "visible": true,
+      "spans": [
+        {
+          "kind": "text",
+          "text": " 5m",
+          "intent": "dim"
+        }
+      ]
+    },
+    "git": {
+      "visible": false
+    },
+    "model": {
+      "visible": true,
+      "spans": [
+        {
+          "kind": "text",
+          "text": " Sol xhigh",
+          "intent": "accent"
+        }
+      ]
+    },
+    "pr": {
+      "visible": false
+    },
+    "tokens": {
+      "visible": true,
+      "spans": [
+        {
+          "kind": "text",
+          "text": "120.0k tokens",
+          "intent": "warn"
+        }
+      ],
+      "compact": [
+        {
+          "kind": "text",
+          "text": "120.0k tok",
+          "intent": "warn"
+        }
+      ]
+    },
+    "usage5h": {
+      "visible": false
+    },
+    "usage7d": {
+      "visible": false
+    },
+    "voice": {
+      "visible": false
+    }
+  },
+  "activity": {
+    "graces": {
+      "toolCompleteMs": 30000,
+      "agentCompleteMs": 30000,
+      "agentRunningStaleMs": 1800000,
+      "todoCompleteMs": 60000
+    },
+    "tools": [
+      {
+        "id": "call-1",
+        "name": "bash",
+        "target": "bun test --coverage",
+        "state": "running",
+        "emittedAtMs": 1748260758000,
+        "startedAtMs": 1748260758000
+      },
+      {
+        "id": "call-4",
+        "name": "grep",
+        "target": "sanitizeStatusText",
+        "state": "running",
+        "emittedAtMs": 1748260797000,
+        "startedAtMs": 1748260797000
+      },
+      {
+        "id": "call-3",
+        "name": "read",
+        "target": "internal/widgets/activity.go",
+        "state": "done",
+        "emittedAtMs": 1748260680000,
+        "startedAtMs": 1748260680000,
+        "endedAtMs": 1748260690000
+      },
+      {
+        "id": "call-2",
+        "name": "read",
+        "target": "internal/render/span.go",
+        "state": "done",
+        "emittedAtMs": 1748260780000,
+        "startedAtMs": 1748260780000,
+        "endedAtMs": 1748260792000
+      }
+    ],
+    "toolCounts": [
+      {
+        "name": "read",
+        "count": 2
+      }
+    ],
+    "agents": null,
+    "todos": null
+  }
+}

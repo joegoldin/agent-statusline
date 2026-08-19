@@ -1,0 +1,6 @@
+<ESC>[38;2;0;175;215m Sol xhigh<ESC>[39m
+<ESC>[38;2;95;175;255m /.../agent-statusline-test-home/pro<ESC>[0m...<ESC>[0m
+<ESC>[38;2;130;135;140m 5m<ESC>[39m
+<ESC>[38;2;236;200;64m <ESC>[39m<ESC>[38;2;220;220;220m <ESC>[39m<ESC>[38;2;236;200;64m54%<ESC>[39m │ <ESC>[38;2;236;200;64m120.0k tok<ESC>[39m │ <ESC>[38;2;224;71;71m $0.42<ESC>[39m
+<ESC>[38;2;236;200;64m▷▷ <ESC>[39m<ESC>[38;2;130;135;140m(42s) <ESC>[39m<ESC>[38;2;236;200;64mbash…age<ESC>[39m<ESC>[38;2;150;150;150m  ·  <ESC>[39m<ESC>[38;2;236;200;64m▷▷ <ESC>[39m<ESC>[38;2;130;135;140m(3s) <ESC>[39m<ESC>[38;2;236;200;64mgrep…Text<ESC>[39m
+<ESC>[38;2;88;204;78m✓ read ×2<ESC>[39m

@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -329,18 +329,30 @@ describe("extension entrypoint", () => {
     }
   });
 
-  // A stand-in for the Go binary: ignores argv, echoes stdin. Lets the tests
-  // assert on the exact payload the extension puts on the wire.
-  function echoBinary(): string {
+  // A stand-in for the Go binary: ignores argv, appends stdin to a log, prints
+  // nothing. The extension now parses stdout as a snapshot rather than echoing
+  // it, so the payload has to be observed on the way in.
+  function recordingBinary() {
     const dir = mkdtempSync(join(tmpdir(), "agent-statusline-"));
     const path = join(dir, "fake-statusline");
-    writeFileSync(path, "#!/bin/sh\nexec cat\n");
+    const log = join(dir, "payloads.jsonl");
+    writeFileSync(path, `#!/bin/sh\ncat >> ${log}\nprintf '\\n' >> ${log}\n`);
     chmodSync(path, 0o755);
-    return path;
+    return {
+      path,
+      payloads: (): any[] => {
+        if (!existsSync(log)) return [];
+        return readFileSync(log, "utf8")
+          .split("\n")
+          .filter((l) => l.trim())
+          .map((l) => JSON.parse(l));
+      },
+    };
   }
 
-  it("renders whatever the binary prints into ctx.ui.setStatus", async () => {
-    process.env.AGENT_STATUSLINE_BIN = echoBinary();
+  it("puts pi's session fields on the wire for the binary", async () => {
+    const bin = recordingBinary();
+    process.env.AGENT_STATUSLINE_BIN = bin.path;
     try {
       const { default: register } = await import("./statusline");
       const pi = fakePi();
@@ -349,10 +361,10 @@ describe("extension entrypoint", () => {
       // Handlers fire the refresh without awaiting it: a statusline must never
       // block the session, so the assertion polls instead.
       await pi.emit("session_start", { type: "session_start", reason: "startup" }, ctx);
-      await waitFor(() => expect(statuses.length).toBe(1));
-      const [key, text] = statuses[0];
-      expect(key).toBe("agent-statusline");
-      const wire = JSON.parse(String(text));
+      await waitFor(() => expect(bin.payloads().length).toBe(1));
+      // Rows go through the widget component now; nothing reaches setStatus.
+      expect(statuses.every(([, text]) => text === undefined)).toBe(true);
+      const wire = bin.payloads()[0];
       expect(wire.harness).toBe("pi");
       expect(wire.session_id).toBe("pi-abc-123");
       expect(wire.session_path).toBe("/home/joe/.pi/agent/sessions/pi-abc-123.jsonl");
@@ -401,12 +413,13 @@ describe("extension entrypoint", () => {
   });
 
   it("accumulates cost and rate limits onto the next payload", async () => {
-    process.env.AGENT_STATUSLINE_BIN = echoBinary();
+    const bin = recordingBinary();
+    process.env.AGENT_STATUSLINE_BIN = bin.path;
     try {
       const { default: register } = await import("./statusline");
       const pi = fakePi();
       register(pi);
-      const { ctx, statuses } = fakeCtx();
+      const { ctx } = fakeCtx();
       await pi.emit("session_start", { type: "session_start", reason: "startup" }, ctx);
       await pi.emit("before_provider_request", { type: "before_provider_request", payload: {} }, ctx);
       await new Promise((r) => setTimeout(r, 5));
@@ -427,9 +440,8 @@ describe("extension entrypoint", () => {
       await pi.emit("agent_settled", { type: "agent_settled" }, ctx);
 
       await waitFor(() => {
-        const last = statuses.at(-1);
-        expect(last).toBeDefined();
-        const wire = JSON.parse(String(last?.[1]));
+        const wire = bin.payloads().at(-1);
+        expect(wire).toBeDefined();
         expect(wire.cost_usd).toBeCloseTo(0.42, 10);
         expect(wire.rate_limits).toEqual({ five_hour: { used_percentage: 12.5, resets_at: 0 } });
         // The assistant breakdown replaces pi's single-number estimate.
@@ -446,5 +458,41 @@ describe("extension entrypoint", () => {
     } finally {
       delete process.env.AGENT_STATUSLINE_BIN;
     }
+  });
+});
+
+describe("extension lifecycle", () => {
+  function fakePi() {
+    const handlers = new Map<string, Function>();
+    return {
+      pi: {
+        on: (e: string, h: Function) => handlers.set(e, h),
+        exec: async () => ({ stdout: "" }),
+      },
+      fire: (e: string, ev: any, ctx: any) => handlers.get(e)?.(ev, ctx),
+      has: (e: string) => handlers.has(e),
+    };
+  }
+
+  it("registers a session_shutdown handler so timers cannot leak", async () => {
+    const { default: register } = await import("./statusline");
+    const f = fakePi();
+    register(f.pi as any);
+    expect(f.has("session_shutdown")).toBe(true);
+  });
+
+  it("spawns the binary with --emit json, never bare --mode pi", () => {
+    // Guards the wire format: an ANSI blob would render as literal escapes now
+    // that the component parses JSON.
+    const src = readFileSync(join(import.meta.dir, "statusline.ts"), "utf8");
+    expect(src).toContain('"--emit", "json"');
+  });
+
+  it("no longer routes any statusline row through setStatus", () => {
+    // The phase-1 bug, deleted rather than fixed: setStatus collapses newlines
+    // and runs of spaces, so a row handed to it can only arrive mangled.
+    const src = readFileSync(join(import.meta.dir, "statusline.ts"), "utf8");
+    expect(src).not.toMatch(/setStatus\?\.\(\s*STATUS_KEY/);
+    expect(src).not.toContain("STATUS_KEY");
   });
 });

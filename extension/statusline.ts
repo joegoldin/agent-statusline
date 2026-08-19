@@ -14,6 +14,9 @@
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 
+import { installStatusline } from "./src/component";
+import { parseSnapshot } from "./src/snapshot";
+
 // ---------------------------------------------------------------------------
 // The pi API surface we touch, mirrored from the real .d.ts files.
 // ---------------------------------------------------------------------------
@@ -339,13 +342,21 @@ function readPiVersion(): string | undefined {
 // Extension entrypoint
 // ---------------------------------------------------------------------------
 
-const STATUS_KEY = "agent-statusline";
+// The data poll is a backstop for values no event announces: git porcelain,
+// rate-limit countdown drift, the compaction counter. The repaint that keeps
+// the spinner and the elapsed clocks alive is a separate, process-free timer
+// inside the widget component.
+const DATA_POLL_MS = 5000;
 
 export default function (pi: any) {
   const state = newSessionState();
   state.version = readPiVersion();
   const binary = process.env.AGENT_STATUSLINE_BIN ?? "agent-statusline";
   let providerStartedAt = 0;
+  let handle: { setSnapshot(s: any): void; dispose(): void } | undefined;
+  let poll: ReturnType<typeof setInterval> | undefined;
+  let inFlight = false;
+  let pendingRefresh = false;
 
   const syncSession = (ctx: PiExtensionContext) => {
     const sm = ctx?.sessionManager;
@@ -375,6 +386,7 @@ export default function (pi: any) {
     } catch {
       // a fresh session has nothing to replay
     }
+    install(ctx);
     void refresh(ctx);
   });
 
@@ -434,18 +446,53 @@ export default function (pi: any) {
   pi.on("tool_execution_start", (e: any) => toolEvent(e, "start"));
   pi.on("tool_execution_end", (e: any) => toolEvent(e, e?.isError ? "fail" : "end"));
 
+  function install(ctx: PiExtensionContext) {
+    handle?.dispose();
+    // onDataStale fires on a branch change, which pi already watches and
+    // debounces for us — cheaper and more responsive than polling git.
+    handle = installStatusline(ctx as any, { onDataStale: () => void refresh(ctx) });
+    if (poll) clearInterval(poll);
+    poll = setInterval(() => void refresh(ctx), DATA_POLL_MS);
+    (poll as { unref?: () => void }).unref?.();
+  }
+
+  function teardown() {
+    if (poll) clearInterval(poll);
+    poll = undefined;
+    handle?.dispose();
+    handle = undefined;
+  }
+
+  pi.on("session_shutdown", () => teardown());
+
   async function refresh(ctx: PiExtensionContext) {
+    // One binary at a time, but never a dropped update: a refresh that arrives
+    // mid-flight is coalesced and re-run at the end, so the frame on screen
+    // always reflects the last event rather than whichever one won a race.
+    if (inFlight) {
+      pendingRefresh = true;
+      return;
+    }
+    inFlight = true;
     try {
       if (!state.sessionId) syncSession(ctx);
       const payload = buildPayload(ctx, state);
       // No cwd override: the Go side reads the workspace out of the payload's
       // `cwd` field, and spawning into a directory that has since been removed
       // would fail the whole refresh.
-      const result = await runBinary(binary, ["--mode", "pi"], JSON.stringify(payload));
-      const line = String(result.stdout ?? "").replace(/\n+$/, "");
-      if (line) ctx?.ui?.setStatus?.(STATUS_KEY, line);
+      const result = await runBinary(binary, ["--mode", "pi", "--emit", "json"], JSON.stringify(payload));
+      const snapshot = parseSnapshot(String(result.stdout ?? ""));
+      // A malformed or newer-schema snapshot leaves the last good frame on
+      // screen: a wrong statusline is worse than a stale one.
+      if (snapshot) handle?.setSnapshot(snapshot);
     } catch {
-      // A failed refresh leaves the previous line in place.
+      // A failed refresh leaves the previous frame in place.
+    } finally {
+      inFlight = false;
+      if (pendingRefresh) {
+        pendingRefresh = false;
+        void refresh(ctx);
+      }
     }
   }
 }

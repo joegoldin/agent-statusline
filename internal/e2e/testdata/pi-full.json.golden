@@ -29,8 +29,16 @@
       "pr",
       "cost"
     ],
+    "row3": [
+      "autoMode"
+    ],
+    "row4": [
+      "cache"
+    ],
     "hide": [],
     "dropPriority": [
+      "autoMode",
+      "cache",
       "sessionName",
       "compaction",
       "pr",
@@ -49,8 +57,133 @@
     ]
   },
   "widgets": {
+    "autoMode": {
+      "visible": true,
+      "spans": [
+        {
+          "kind": "text",
+          "text": " auto ●",
+          "intent": "ok"
+        },
+        {
+          "kind": "text",
+          "text": " │ ",
+          "intent": "text"
+        },
+        {
+          "kind": "text",
+          "text": "✓ 105",
+          "intent": "ok"
+        },
+        {
+          "kind": "text",
+          "text": " ",
+          "intent": "text"
+        },
+        {
+          "kind": "text",
+          "text": "✗ 4",
+          "intent": "danger"
+        },
+        {
+          "kind": "text",
+          "text": " │ ",
+          "intent": "text"
+        },
+        {
+          "kind": "text",
+          "text": " 89/4",
+          "intent": "meta"
+        }
+      ],
+      "compact": [
+        {
+          "kind": "text",
+          "text": " ●",
+          "intent": "ok"
+        },
+        {
+          "kind": "text",
+          "text": " │ ",
+          "intent": "text"
+        },
+        {
+          "kind": "text",
+          "text": "✓ 105",
+          "intent": "ok"
+        },
+        {
+          "kind": "text",
+          "text": " ",
+          "intent": "text"
+        },
+        {
+          "kind": "text",
+          "text": "✗ 4",
+          "intent": "danger"
+        }
+      ]
+    },
     "burnRate": {
       "visible": false
+    },
+    "cache": {
+      "visible": true,
+      "spans": [
+        {
+          "kind": "text",
+          "text": " cache 79.3%",
+          "intent": "ok"
+        },
+        {
+          "kind": "text",
+          "text": " │ ",
+          "intent": "text"
+        },
+        {
+          "kind": "bar",
+          "fill": 0.7934272300469484,
+          "cells": 10,
+          "style": "braille"
+        },
+        {
+          "kind": "text",
+          "text": " │ ",
+          "intent": "text"
+        },
+        {
+          "kind": "text",
+          "text": "1.69M/2.13M",
+          "intent": "dim"
+        },
+        {
+          "kind": "text",
+          "text": " │ ",
+          "intent": "text"
+        },
+        {
+          "kind": "text",
+          "text": "35/41",
+          "intent": "meta"
+        }
+      ],
+      "compact": [
+        {
+          "kind": "text",
+          "text": " cache 79.3%",
+          "intent": "ok"
+        },
+        {
+          "kind": "text",
+          "text": " │ ",
+          "intent": "text"
+        },
+        {
+          "kind": "text",
+          "text": "35/41",
+          "intent": "meta"
+        }
+      ]
     },
     "compaction": {
       "visible": false

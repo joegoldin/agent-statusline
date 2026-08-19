@@ -3,6 +3,7 @@ package emit
 import (
 	"bytes"
 	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 
@@ -128,5 +129,29 @@ func TestWriteIsDeterministic(t *testing.T) {
 	}
 	if a.Bytes()[a.Len()-1] != '\n' {
 		t.Error("Write must end with a newline")
+	}
+}
+
+func TestBuildSnapshotsTheExtraRows(t *testing.T) {
+	ctx := testCtx()
+	ctx.Status.AutoMode = "AM● a:9 d:1"
+	reg := testRegistry()
+	reg[widgets.AutoMode{}.Name()] = widgets.AutoMode{}
+	reg[widgets.Cache{}.Name()] = widgets.Cache{}
+
+	s := Build(ctx, reg, nil)
+	if !s.Widgets["autoMode"].Visible {
+		t.Error("autoMode configured on row3 but missing from the snapshot")
+	}
+	// The cache sidecar is absent in this context, so the widget must be
+	// carried as configured-but-hidden rather than dropped.
+	if snap, ok := s.Widgets["cache"]; !ok || snap.Visible {
+		t.Errorf("cache snapshot = %+v, want present and hidden", snap)
+	}
+	if want := []string{"autoMode"}; !reflect.DeepEqual(s.Config.Row3, want) {
+		t.Errorf("Config.Row3 = %v, want %v", s.Config.Row3, want)
+	}
+	if want := []string{"cache"}; !reflect.DeepEqual(s.Config.Row4, want) {
+		t.Errorf("Config.Row4 = %v, want %v", s.Config.Row4, want)
 	}
 }

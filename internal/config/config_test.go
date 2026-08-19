@@ -86,3 +86,32 @@ func TestLoadMalformedFallsBackToDefaults(t *testing.T) {
 		t.Errorf("ActivityRows should still default, got %d", c.ActivityRows)
 	}
 }
+
+func TestDefaultsPlaceTheExtraRows(t *testing.T) {
+	c := Defaults()
+	if want := []string{"autoMode"}; !reflect.DeepEqual(c.Widgets.Row3, want) {
+		t.Errorf("Row3 = %v, want %v", c.Widgets.Row3, want)
+	}
+	if want := []string{"cache"}; !reflect.DeepEqual(c.Widgets.Row4, want) {
+		t.Errorf("Row4 = %v, want %v", c.Widgets.Row4, want)
+	}
+}
+
+func TestLoadEmptiesARowWhenAsked(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "statusline-config.json")
+	// An empty list is how a row is turned off, so it has to survive the merge
+	// rather than being mistaken for "unset" and replaced by the default.
+	if err := os.WriteFile(path, []byte(`{"widgets":{"row3":[],"row4":["cache"]}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(c.Widgets.Row3) != 0 {
+		t.Errorf("Row3 = %v, want empty", c.Widgets.Row3)
+	}
+	if !reflect.DeepEqual(c.Widgets.Row4, []string{"cache"}) {
+		t.Errorf("Row4 = %v", c.Widgets.Row4)
+	}
+}

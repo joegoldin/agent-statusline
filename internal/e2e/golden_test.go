@@ -43,6 +43,17 @@ func TestGolden(t *testing.T) {
 	}
 }
 
+// mustAbs resolves a testdata path for an env var, which the binary reads from
+// its own working directory rather than the test's.
+func mustAbs(t *testing.T, path string) string {
+	t.Helper()
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return abs
+}
+
 func runGolden(t *testing.T, tc fixture) {
 	t.Helper()
 	stdinPath := filepath.Join("testdata", tc.name+".json")
@@ -70,6 +81,9 @@ func runGolden(t *testing.T, tc fixture) {
 		"HOME=/tmp/claude-statusline-test-home",
 		"CLAUDE_CONFIG_DIR=/tmp/claude-statusline-test-home/.claude",
 		"GIT_CONFIG_GLOBAL=/dev/null",
+		// The cache widget reads pi's state directory, so point it at a fixture
+		// rather than at whatever the machine running the tests has cached.
+		"PI_CODING_AGENT_DIR="+mustAbs(t, filepath.Join("testdata", "pi-agent")),
 	)
 	out, err := cmd.Output()
 	if err != nil {

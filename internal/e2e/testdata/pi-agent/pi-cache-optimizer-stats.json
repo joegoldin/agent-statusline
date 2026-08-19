@@ -1,0 +1,15 @@
+{
+  "version": 6,
+  "sessions": {},
+  "totalsByModel": {
+    "openai-codex/gpt-5.6-sol": {
+      "day": "2025-05-26",
+      "totalRequests": 41,
+      "hitRequests": 35,
+      "cachedInputTokens": 1690000,
+      "cacheWriteInputTokens": 24000,
+      "totalInputTokens": 2130000
+    }
+  },
+  "legacyFamily": {}
+}

@@ -26,6 +26,8 @@ type Config struct {
 type Widgets struct {
 	Row1 []string `json:"row1"`
 	Row2 []string `json:"row2"`
+	Row3 []string `json:"row3"`
+	Row4 []string `json:"row4"`
 	Hide []string `json:"hide"`
 }
 
@@ -43,6 +45,13 @@ func Defaults() Config {
 			Row1: []string{"model", "cwd", "git", "duration", "usage5h", "usage7d"},
 			// Row 2 — conversation state (what's happening this session).
 			Row2: []string{"context", "tokens", "burnRate", "voice", "compaction", "pr", "cost"},
+			// Rows 3 and 4 each carry one widget that draws several figures of
+			// its own, so they get a line rather than a slot: crowding them
+			// into row 2 would push the conversation state off a narrow
+			// terminal. Both hide themselves when their source is absent, and
+			// an empty row costs no line.
+			Row3: []string{"autoMode"},
+			Row4: []string{"cache"},
 			Hide: []string{},
 		},
 		TokenFormat:             "compact",
@@ -88,6 +97,8 @@ type overlayConfig struct {
 type overlayWidgets struct {
 	Row1 *[]string `json:"row1"`
 	Row2 *[]string `json:"row2"`
+	Row3 *[]string `json:"row3"`
+	Row4 *[]string `json:"row4"`
 	Hide *[]string `json:"hide"`
 }
 
@@ -110,6 +121,12 @@ func (o overlayConfig) applyTo(c *Config) {
 		}
 		if o.Widgets.Row2 != nil {
 			c.Widgets.Row2 = *o.Widgets.Row2
+		}
+		if o.Widgets.Row3 != nil {
+			c.Widgets.Row3 = *o.Widgets.Row3
+		}
+		if o.Widgets.Row4 != nil {
+			c.Widgets.Row4 = *o.Widgets.Row4
 		}
 		if o.Widgets.Hide != nil {
 			c.Widgets.Hide = *o.Widgets.Hide

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/joegoldin/agent-statusline/internal/cachestats"
 	"github.com/joegoldin/agent-statusline/internal/compaction"
 	"github.com/joegoldin/agent-statusline/internal/config"
 	"github.com/joegoldin/agent-statusline/internal/emit"
@@ -28,6 +29,7 @@ import (
 // Conversation-state widgets drop before identity/account widgets, so a
 // narrow terminal keeps the "who/where/budget" header intact.
 var dropPriority = []string{
+	"autoMode", "cache",
 	"sessionName", "compaction", "pr", "voice", "cost",
 	"burnRate", "duration", "tokens", "effort", "context",
 	"usage7d", "usage5h", "git", "cwd", "model",
@@ -138,6 +140,17 @@ func main() {
 		}
 		return n
 	})
+	ctx.CacheStatsProvider = memoize(func() *cachestats.Stats {
+		// Written by pi's cache-optimizer extension, never by us. Absent on
+		// every Claude Code run and on any pi without that extension, which is
+		// why a read failure only hides the widget.
+		s, err := cachestats.Load(cachestats.Path())
+		if err != nil {
+			debugLog("cachestats.Load: %v", err)
+			return nil
+		}
+		return s
+	})
 	ctx.ToolTimingProvider = memoize(func() map[string]toolclock.Entry {
 		return toolclock.Load(cacheRoot, status.SessionID)
 	})
@@ -190,6 +203,13 @@ func main() {
 		wrapOpts := layout.Options{Width: width, Hide: cfg.Widgets.Hide}
 		dashboard = append(dashboard, layout.WrapRow(row1Widgets, ctx, wrapOpts)...)
 		dashboard = append(dashboard, layout.WrapRow(row2Widgets, ctx, wrapOpts)...)
+	}
+	// Rows 3 and 4 are extra lines rather than dashboard columns: each carries a
+	// single widget that draws several figures of its own. They wrap like the
+	// dashboard and cost nothing when their widget hides.
+	for _, names := range [][]string{cfg.Widgets.Row3, cfg.Widgets.Row4} {
+		dashboard = append(dashboard, layout.WrapRow(resolveRow(names, registry), ctx,
+			layout.Options{Width: width, Hide: cfg.Widgets.Hide})...)
 	}
 	if len(dashboard) > maxLines {
 		dashboard = dashboard[:maxLines]
@@ -251,7 +271,7 @@ func buildRegistry() widgets.Registry {
 		widgets.Cost{}, widgets.Duration{}, widgets.Tokens{},
 		widgets.Usage5h{}, widgets.Usage7d{}, widgets.BurnRate{},
 		widgets.Effort{}, widgets.Voice{}, widgets.Compaction{}, widgets.PR{},
-		widgets.SessionName{},
+		widgets.SessionName{}, widgets.AutoMode{}, widgets.Cache{},
 	}
 	r := widgets.Registry{}
 	for _, w := range all {

@@ -58,6 +58,8 @@ type SnapshotConfig struct {
 	FlexName          string   `json:"flexName"`
 	Row1              []string `json:"row1"`
 	Row2              []string `json:"row2"`
+	Row3              []string `json:"row3"`
+	Row4              []string `json:"row4"`
 	Hide              []string `json:"hide"`
 	DropPriority      []string `json:"dropPriority"`
 }
@@ -85,8 +87,10 @@ func Build(ctx *widgets.Context, reg widgets.Registry, dropPriority []string) Sn
 	defer func() { ctx.Width = restore }()
 
 	names := map[string]bool{}
-	for _, n := range append(append([]string{}, cfg.Widgets.Row1...), cfg.Widgets.Row2...) {
-		names[n] = true
+	for _, row := range [][]string{cfg.Widgets.Row1, cfg.Widgets.Row2, cfg.Widgets.Row3, cfg.Widgets.Row4} {
+		for _, n := range row {
+			names[n] = true
+		}
 	}
 
 	out := map[string]WidgetSnapshot{}
@@ -132,6 +136,8 @@ func Build(ctx *widgets.Context, reg widgets.Registry, dropPriority []string) Sn
 			FlexName:          flexNameLiteral,
 			Row1:              nonNil(cfg.Widgets.Row1),
 			Row2:              nonNil(cfg.Widgets.Row2),
+			Row3:              nonNil(cfg.Widgets.Row3),
+			Row4:              nonNil(cfg.Widgets.Row4),
 			Hide:              nonNil(cfg.Widgets.Hide),
 			DropPriority:      nonNil(dropPriority),
 		},

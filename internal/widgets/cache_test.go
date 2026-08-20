@@ -189,3 +189,18 @@ func TestHumanTokens(t *testing.T) {
 		}
 	}
 }
+
+func TestCacheRowStartsWithItsGlyph(t *testing.T) {
+	// The literal shipped as a bare space: the comment named nf-fa-database and
+	// the string held only the separator, so the cache row drew one column in
+	// from every other row with no icon where theirs sat. Asserted through
+	// Render, because what went wrong is what the row looks like.
+	ctx := cacheCtx(t, cacheStatsFixture, "openai-codex", "gpt-5.6-sol")
+	out, ok := (Cache{}).Render(ctx)
+	if !ok {
+		t.Fatal("expected the cache row to render")
+	}
+	if !strings.HasPrefix(render.StripANSI(out), "\uf1c0 cache ") {
+		t.Errorf("cache row = %q, want it to open with the nf-fa-database glyph", render.StripANSI(out))
+	}
+}

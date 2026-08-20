@@ -7,7 +7,7 @@ import (
 	"github.com/joegoldin/agent-statusline/internal/render"
 )
 
-const cacheGlyph = " " // nf-fa-database
+const cacheGlyph = "\uf1c0 " // nf-fa-database
 
 // Cache renders the prompt-cache accounting the pi cache-optimizer extension
 // keeps for the active model: what share of input tokens came back from the

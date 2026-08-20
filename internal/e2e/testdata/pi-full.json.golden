@@ -133,16 +133,6 @@
           "kind": "text",
           "text": " cache 79.3%",
           "intent": "ok"
-        },
-        {
-          "kind": "text",
-          "text": " │ ",
-          "intent": "text"
-        },
-        {
-          "kind": "text",
-          "text": "35/41",
-          "intent": "meta"
         }
       ]
     },

@@ -2,7 +2,6 @@ package widgets
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/joegoldin/agent-statusline/internal/render"
 )
@@ -10,10 +9,14 @@ import (
 const cacheGlyph = "\uf1c0 " // nf-fa-database
 
 // Cache renders the prompt-cache accounting the pi cache-optimizer extension
-// keeps for the active model: what share of input tokens came back from the
-// provider's cache, and how many requests hit it at all. Two figures, because
-// they measure different things -- a session can cache 93% of its tokens while
-// missing on 4 of 82 calls, since the misses are the small ones.
+// keeps for the active model: one figure, the share of input tokens that came
+// back from the provider's cache.
+//
+// It was four fields once -- a bar, a cached/total token pair and a
+// hit/total request ratio alongside the percentage. The first two were the
+// percentage restated (the bar is pct/100; the pair is the fraction it
+// divides). The request ratio was not, but a second number on a status line
+// has to earn the width against the glance it costs, and this one did not.
 //
 // The sidecar totals are per day and per model, not per session, so this is
 // "today, on this model" and it resets at midnight.
@@ -40,17 +43,6 @@ func (Cache) RenderSpans(ctx *Context) (render.Spans, bool) {
 	intent := render.ThresholdIntent(100 - pct)
 	spans := render.Spans{
 		render.Text(intent, fmt.Sprintf("%scache %.1f%%", cacheGlyph, pct)),
-	}
-	// No bar and no token pair, at any width. Both were the percentage a second
-	// and third time -- the bar is pct/100 by construction, and the token pair
-	// is the very fraction the percentage divides -- so the row spent four
-	// columns of figures saying one thing. The request ratio below is the only
-	// number here that is not derivable from the percentage: it counts calls,
-	// not tokens, which is why it can read 78/82 while the tokens read 93%.
-	if t.TotalRequests > 0 {
-		spans = append(spans,
-			render.Text(render.IntentText, rowSeparator),
-			render.Text(render.IntentMeta, strconv.Itoa(t.HitRequests)+"/"+strconv.Itoa(t.TotalRequests)))
 	}
 	return spans, true
 }

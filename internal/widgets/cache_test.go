@@ -73,7 +73,7 @@ func TestCacheRender(t *testing.T) {
 			provider: "openai-codex",
 			id:       "gpt-5.6-sol",
 			visible:  true,
-			want:     []string{"cache", "79.3%", "35/41"},
+			want:     []string{"cache", "79.3%"},
 		},
 		{
 			name:     "file missing",
@@ -126,12 +126,10 @@ func TestCacheHidesWithoutAProvider(t *testing.T) {
 	}
 }
 
-func TestCacheRowIsTheGlyphThePercentAndTheRequests(t *testing.T) {
-	// Three fields, and only two numbers, because the bar and the cached/total
-	// token pair were both the percentage restated: the bar is pct/100 by
-	// construction and the pair is the fraction it divides. What is left is the
-	// percentage (tokens) and the request ratio, which counts calls and so can
-	// disagree with it.
+func TestCacheRowIsTheGlyphAndThePercent(t *testing.T) {
+	// One figure, at every width. The bar and the cached/total token pair were
+	// the percentage restated, and the hit/total request ratio was dropped
+	// after it: a second number has to earn its width on a status line.
 	ctx := cacheCtx(t, cacheStatsFixture, "openai-codex", "gpt-5.6-sol")
 	for _, width := range []int{40, 80, 200} {
 		ctx.Width = width
@@ -144,7 +142,7 @@ func TestCacheRowIsTheGlyphThePercentAndTheRequests(t *testing.T) {
 				t.Errorf("width %d: cache row still emits a bar span", width)
 			}
 		}
-		if got, want := render.StripANSI(spans.ANSI()), "\uf1c0 cache 79.3% │ 35/41"; got != want {
+		if got, want := render.StripANSI(spans.ANSI()), "\uf1c0 cache 79.3%"; got != want {
 			t.Errorf("width %d: row = %q, want %q", width, got, want)
 		}
 	}

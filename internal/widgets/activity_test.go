@@ -309,8 +309,12 @@ func TestToolsCompletedCommandFitsWidth(t *testing.T) {
 }
 
 func TestToolsHidesWhenNothingRunning(t *testing.T) {
-	// Only completed tools (ToolCounts) → the running row hides.
-	e := &transcript.Entries{ToolCounts: []transcript.ToolCount{{Name: "Read", Count: 1}}}
+	// A tool that finished long enough ago to be past the linger grace: the
+	// transcript is not empty, and the running row still hides.
+	now := time.Unix(1_000_000, 0)
+	e := &transcript.Entries{RecentTools: []transcript.Tool{
+		{ID: "1", Name: "Read", Timestamp: now.Add(-2 * toolCompleteGrace), EndedAt: now.Add(-2 * toolCompleteGrace)},
+	}}
 	if _, vis := (&Tools{}).Render(actCtx(e)); vis {
 		t.Errorf("expected hidden when nothing running")
 	}
@@ -446,68 +450,6 @@ func TestToolsCompletedUsesRealRunLength(t *testing.T) {
 	plain := render.StripANSI(out)
 	if !strings.Contains(plain, "(12s)") {
 		t.Errorf("expected real run length (12s) on completed tool in %q", plain)
-	}
-}
-
-func TestToolsRecentAggregatesByName(t *testing.T) {
-	e := &transcript.Entries{ToolCounts: []transcript.ToolCount{
-		{Name: "Read", Count: 3},
-		{Name: "Grep", Count: 1},
-	}}
-	out, vis := (&ToolsRecent{}).Render(actCtx(e))
-	if !vis {
-		t.Fatal("expected visible")
-	}
-	if !strings.Contains(out, "Read") || !strings.Contains(out, "×3") {
-		t.Errorf("expected Read ×3 in %q", out)
-	}
-	if !strings.Contains(out, "Grep") || !strings.Contains(out, "×1") {
-		t.Errorf("expected Grep ×1 in %q", out)
-	}
-}
-
-func TestToolsRecentFoldsMCPCalls(t *testing.T) {
-	e := &transcript.Entries{ToolCounts: []transcript.ToolCount{
-		{Name: "mcp__server_a__foo", Count: 3},
-		{Name: "mcp__server_b__bar", Count: 2},
-		{Name: "Skill", Count: 2},
-		{Name: "Bash", Count: 39},
-	}}
-	out, vis := (&ToolsRecent{}).Render(actCtx(e))
-	if !vis {
-		t.Fatal("expected visible")
-	}
-	if !strings.Contains(out, "MCP ×5") {
-		t.Errorf("expected all mcp__* folded into MCP ×5 in %q", out)
-	}
-	if !strings.Contains(out, "Skill ×2") {
-		t.Errorf("expected Skill ×2 alongside MCP in %q", out)
-	}
-	if strings.Contains(out, "mcp__") {
-		t.Errorf("raw mcp__ tool names should not appear: %q", out)
-	}
-}
-
-func TestToolsRecentShowsUpToFive(t *testing.T) {
-	e := &transcript.Entries{ToolCounts: []transcript.ToolCount{
-		{Name: "Bash", Count: 39}, {Name: "Edit", Count: 18}, {Name: "Read", Count: 11},
-		{Name: "Skill", Count: 5}, {Name: "Write", Count: 3}, {Name: "Grep", Count: 2},
-	}}
-	out, _ := (&ToolsRecent{}).Render(actCtx(e))
-	if got := strings.Count(out, "×"); got != 5 {
-		t.Errorf("expected 5 columns, got %d in %q", got, out)
-	}
-	if strings.Contains(out, "Grep") {
-		t.Errorf("lowest-count tool should be dropped past 5 columns: %q", out)
-	}
-}
-
-func TestToolsRecentHidesWhenNothingCompleted(t *testing.T) {
-	e := &transcript.Entries{Tools: []transcript.Tool{
-		{ID: "1", Name: "Bash", Timestamp: time.Unix(1_000_000, 0)},
-	}}
-	if _, vis := (&ToolsRecent{}).Render(actCtx(e)); vis {
-		t.Errorf("expected hidden when only running tools")
 	}
 }
 

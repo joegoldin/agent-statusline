@@ -161,7 +161,7 @@ describe("renderRows", () => {
     const empty: Snapshot = {
       ...snap,
       widgets: {},
-      activity: { ...snap.activity, tools: [], toolCounts: [], agents: [], todos: null },
+      activity: { ...snap.activity, tools: [], agents: [], todos: null },
     };
     expect(renderRows(empty, 80, theme, NOW)).toEqual([]);
   });

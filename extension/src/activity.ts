@@ -114,18 +114,6 @@ function toolsRow(snap: Snapshot, width: number, now: number): Span[] | undefine
   return spans;
 }
 
-/** The completed-tool aggregate row: `✓ Read ×3`, MCP already folded by Go. */
-function toolCountsRow(snap: Snapshot): Span[] | undefined {
-  const counts = (snap.activity.toolCounts ?? []).slice(0, 5);
-  if (counts.length === 0) return undefined;
-  const spans: Span[] = [];
-  counts.forEach((c, i) => {
-    if (i > 0) spans.push(text("muted", ITEM_SEPARATOR));
-    spans.push(text("ok", `${DONE_GLYPH} ${c.name} ×${c.count}`));
-  });
-  return spans;
-}
-
 /** The subagent row. */
 function agentsRow(snap: Snapshot, now: number): Span[] | undefined {
   const graces = snap.activity.graces;
@@ -190,7 +178,6 @@ export function activityRows(
   const rows: string[] = [];
   for (const build of [
     () => toolsRow(snap, width, now),
-    () => toolCountsRow(snap),
     () => agentsRow(snap, now),
     () => todosRow(snap, now),
   ]) {

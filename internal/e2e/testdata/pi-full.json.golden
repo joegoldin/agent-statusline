@@ -312,7 +312,6 @@
       "todoCompleteMs": 60000
     },
     "tools": null,
-    "toolCounts": null,
     "agents": null,
     "todos": null
   }

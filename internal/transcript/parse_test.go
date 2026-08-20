@@ -65,45 +65,15 @@ func TestParseTailExtractsToolUsesFromContentBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Read completed (has a tool_result) → ToolCounts; Bash is still running → Tools.
+	// Read completed (has a tool_result) → RecentTools; Bash is still running → Tools.
 	if len(entries.Tools) != 1 {
 		t.Fatalf("running tools = %d, want 1 (%+v)", len(entries.Tools), entries.Tools)
 	}
 	if entries.Tools[0].Name != "Bash" || !strings.Contains(entries.Tools[0].Target, "go test") {
 		t.Errorf("running tool = %+v", entries.Tools[0])
 	}
-	if len(entries.ToolCounts) != 1 || entries.ToolCounts[0].Name != "Read" || entries.ToolCounts[0].Count != 1 {
-		t.Errorf("tool counts = %+v, want Read ×1", entries.ToolCounts)
-	}
-}
-
-func TestParseTailToolCountsAccumulate(t *testing.T) {
-	now := time.Date(2026, 5, 26, 12, 0, 0, 0, time.UTC)
-	lines := []string{}
-	// Three completed Reads + one completed Bash, across separate turns.
-	for i, n := range []string{"r1", "r2", "r3", "b1"} {
-		name := "Read"
-		if n == "b1" {
-			name = "Bash"
-		}
-		ts := now.Add(time.Duration(-40+i*5) * time.Second)
-		lines = append(lines,
-			assistantLine("m"+n, ts, usage{input: 10}, []block{
-				{Type: "tool_use", ID: "t" + n, Name: name, Input: `{}`},
-			}),
-			userResultLine(ts.Add(time.Second), "t"+n, false),
-		)
-	}
-	entries, err := ParseTail(writeJSONL(t, lines), 64*1024)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := map[string]int{}
-	for _, c := range entries.ToolCounts {
-		got[c.Name] = c.Count
-	}
-	if got["Read"] != 3 || got["Bash"] != 1 {
-		t.Errorf("counts = %+v, want Read 3 / Bash 1", got)
+	if len(entries.RecentTools) != 1 || entries.RecentTools[0].Name != "Read" {
+		t.Errorf("recent tools = %+v, want one Read", entries.RecentTools)
 	}
 }
 
@@ -164,7 +134,7 @@ func TestParseTailTracksTasksFromCreateResults(t *testing.T) {
 	}
 }
 
-func TestParseTailResetsToolCountsAtCompaction(t *testing.T) {
+func TestParseTailResetsCompletedToolsAtCompaction(t *testing.T) {
 	now := time.Date(2026, 5, 26, 12, 0, 0, 0, time.UTC)
 	mk := func(id string, ts time.Time, promptInput int, tool string) []string {
 		return []string{
@@ -187,15 +157,15 @@ func TestParseTailResetsToolCountsAtCompaction(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := map[string]int{}
-	for _, c := range entries.ToolCounts {
-		got[c.Name] = c.Count
+	for _, c := range entries.RecentTools {
+		got[c.Name]++
 	}
 	// Only the post-compaction Edit should remain; pre-compaction Reads/Bash reset.
 	if got["Edit"] != 1 {
 		t.Errorf("Edit count = %d, want 1", got["Edit"])
 	}
 	if got["Read"] != 0 || got["Bash"] != 0 {
-		t.Errorf("pre-compaction counts should reset, got %+v", got)
+		t.Errorf("pre-compaction tools should reset, got %+v", got)
 	}
 }
 
@@ -220,8 +190,8 @@ func TestParseTailResetsAtCompactionMarker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries.ToolCounts) != 0 {
-		t.Errorf("tool counts should reset at marker, got %+v", entries.ToolCounts)
+	if len(entries.RecentTools) != 0 {
+		t.Errorf("completed tools should reset at marker, got %+v", entries.RecentTools)
 	}
 	// Todos have their own lifecycle and must survive a compaction.
 	if len(entries.Todos) == 0 {

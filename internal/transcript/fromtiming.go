@@ -22,7 +22,6 @@ func FromToolTiming(timing map[string]toolclock.Entry, now time.Time, window tim
 		return e
 	}
 
-	counts := map[string]int{}
 	for id, t := range timing {
 		tool := Tool{
 			ID:        id,
@@ -39,7 +38,6 @@ func FromToolTiming(timing map[string]toolclock.Entry, now time.Time, window tim
 			continue
 		}
 		e.RecentTools = append(e.RecentTools, tool)
-		counts[t.Name]++
 	}
 
 	// Map iteration order is randomised, and these slices drive rendering, so
@@ -54,14 +52,5 @@ func FromToolTiming(timing map[string]toolclock.Entry, now time.Time, window tim
 	}
 	byRecency(e.Tools)
 	byRecency(e.RecentTools)
-
-	names := make([]string, 0, len(counts))
-	for n := range counts {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	for _, n := range names {
-		e.ToolCounts = append(e.ToolCounts, ToolCount{Name: n, Count: counts[n]})
-	}
 	return e
 }

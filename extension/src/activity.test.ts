@@ -37,7 +37,6 @@ function snapWith(activity: Partial<Snapshot["activity"]>): Snapshot {
         todoCompleteMs: 60000,
       },
       tools: [],
-      toolCounts: [],
       agents: [],
       todos: null,
       ...activity,
@@ -127,11 +126,11 @@ describe("activityRows", () => {
     const { theme } = recordingTheme();
     const snap = snapWith({
       tools: [{ id: "c1", name: "bash", state: "running", startedAtMs: NOW }],
-      toolCounts: [{ name: "read", count: 3 }],
       agents: [{ name: "Explore", startedAtMs: NOW }],
       todos: { subject: "ship it", done: 1, total: 3, allComplete: false, timestampMs: NOW },
     });
-    expect(activityRows(snap, 200, theme, NOW, 4).length).toBe(4);
+    // Three rows deep now: running tools, agents, todos.
+    expect(activityRows(snap, 200, theme, NOW, 4).length).toBe(3);
     expect(activityRows(snap, 200, theme, NOW, 2).length).toBe(2);
     expect(activityRows(snap, 200, theme, NOW, 0).length).toBe(0);
   });
@@ -156,7 +155,7 @@ describe("activityRows", () => {
 
   it("tolerates null activity arrays from an older snapshot", () => {
     const { theme } = recordingTheme();
-    const snap = snapWith({ tools: null, toolCounts: null, agents: null });
+    const snap = snapWith({ tools: null, agents: null });
     expect(activityRows(snap, 200, theme, NOW, 4)).toEqual([]);
   });
 
@@ -167,7 +166,6 @@ describe("activityRows", () => {
         { id: "c1", name: "bash", target: "a".repeat(200), state: "running", startedAtMs: NOW - 1 },
         { id: "c2", name: "read", target: "b".repeat(200), state: "running", startedAtMs: NOW - 1 },
       ],
-      toolCounts: [{ name: "read", count: 3 }],
       agents: [{ name: "Explore", model: "sol", description: "c".repeat(200), startedAtMs: NOW }],
       todos: { subject: "d".repeat(200), done: 1, total: 3, allComplete: false, timestampMs: NOW },
     });

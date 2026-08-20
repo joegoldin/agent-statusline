@@ -29,10 +29,6 @@ type accumulator struct {
 	PendingTools map[string]Tool `json:"pending_tools"`
 	PendingOrder []string        `json:"pending_order"`
 
-	// Completed tools aggregated by name (session totals) + first-seen order.
-	CompletedCounts map[string]int `json:"completed_counts"`
-	CompletedOrder  []string       `json:"completed_order"`
-
 	// RecentTools holds the most recently completed tools (with EndedAt) so a
 	// finished command can linger briefly on screen instead of vanishing the
 	// instant its tool_result arrives. Bounded to a handful; the widget
@@ -78,8 +74,6 @@ const epochDropRatio = 0.6
 func (a *accumulator) resetEpoch() {
 	a.PendingTools = map[string]Tool{}
 	a.PendingOrder = nil
-	a.CompletedCounts = map[string]int{}
-	a.CompletedOrder = nil
 	a.RecentTools = nil
 	a.Agents = map[string]Agent{}
 	a.AgentOrder = nil
@@ -103,11 +97,10 @@ func (a *accumulator) observePrompt(promptSize int) bool {
 
 func newAccumulator(path string) *accumulator {
 	return &accumulator{
-		Path:            path,
-		PendingTools:    map[string]Tool{},
-		CompletedCounts: map[string]int{},
-		Agents:          map[string]Agent{},
-		TaskByID:        map[string]TodoItem{},
+		Path:         path,
+		PendingTools: map[string]Tool{},
+		Agents:       map[string]Agent{},
+		TaskByID:     map[string]TodoItem{},
 	}
 }
 
@@ -116,9 +109,6 @@ func newAccumulator(path string) *accumulator {
 func (a *accumulator) ensureMaps() {
 	if a.PendingTools == nil {
 		a.PendingTools = map[string]Tool{}
-	}
-	if a.CompletedCounts == nil {
-		a.CompletedCounts = map[string]int{}
 	}
 	if a.Agents == nil {
 		a.Agents = map[string]Agent{}
@@ -220,10 +210,6 @@ func (a *accumulator) completeTool(id string, ts time.Time) {
 	if !ok {
 		return
 	}
-	if _, seen := a.CompletedCounts[t.Name]; !seen {
-		a.CompletedOrder = append(a.CompletedOrder, t.Name)
-	}
-	a.CompletedCounts[t.Name]++
 	delete(a.PendingTools, id)
 	a.PendingOrder = removeString(a.PendingOrder, id)
 
@@ -323,9 +309,6 @@ func (a *accumulator) toEntries() *Entries {
 		}
 	}
 	e.RecentTools = append(e.RecentTools, a.RecentTools...)
-	for _, name := range a.CompletedOrder {
-		e.ToolCounts = append(e.ToolCounts, ToolCount{Name: name, Count: a.CompletedCounts[name]})
-	}
 	for _, id := range a.AgentOrder {
 		if ag, ok := a.Agents[id]; ok {
 			e.Agents = append(e.Agents, ag)

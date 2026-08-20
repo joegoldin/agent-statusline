@@ -48,23 +48,6 @@ func TestFromToolTimingDropsEntriesOutsideWindow(t *testing.T) {
 	}
 }
 
-func TestFromToolTimingCountsCompletedByName(t *testing.T) {
-	now := time.Unix(1748260800, 0)
-	timing := map[string]toolclock.Entry{
-		"a": {Name: "bash", StartedAt: now.Add(-9 * time.Second), EndedAt: now.Add(-8 * time.Second)},
-		"b": {Name: "bash", StartedAt: now.Add(-7 * time.Second), EndedAt: now.Add(-6 * time.Second)},
-		"c": {Name: "read", StartedAt: now.Add(-5 * time.Second), EndedAt: now.Add(-4 * time.Second)},
-	}
-	e := FromToolTiming(timing, now, 5*time.Minute)
-	got := map[string]int{}
-	for _, tc := range e.ToolCounts {
-		got[tc.Name] = tc.Count
-	}
-	if got["bash"] != 2 || got["read"] != 1 {
-		t.Errorf("ToolCounts = %+v, want bash=2 read=1", e.ToolCounts)
-	}
-}
-
 func TestFromToolTimingIsDeterministic(t *testing.T) {
 	now := time.Unix(1748260800, 0)
 	timing := map[string]toolclock.Entry{

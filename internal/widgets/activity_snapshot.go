@@ -21,7 +21,6 @@ import (
 type ActivitySnapshot struct {
 	Graces     ActivityGraces  `json:"graces"`
 	Tools      []ActivityItem  `json:"tools"`
-	ToolCounts []ToolCountItem `json:"toolCounts"`
 	Agents     []AgentItem     `json:"agents"`
 	Todos      *TodoItem       `json:"todos"`
 }
@@ -46,11 +45,6 @@ type ActivityItem struct {
 	EmittedAtMs int64  `json:"emittedAtMs,omitempty"`
 	StartedAtMs int64  `json:"startedAtMs,omitempty"`
 	EndedAtMs   int64  `json:"endedAtMs,omitempty"`
-}
-
-type ToolCountItem struct {
-	Name  string `json:"name"`
-	Count int    `json:"count"`
 }
 
 type AgentItem struct {
@@ -133,16 +127,6 @@ func BuildActivitySnapshot(ctx *Context) ActivitySnapshot {
 			EndedAtMs: firstNonZero(epochMs(e.EndedAt), epochMs(t.EndedAt)),
 		})
 	}
-
-	for _, c := range foldMCPCounts(entries.ToolCounts) {
-		snap.ToolCounts = append(snap.ToolCounts, ToolCountItem{Name: c.Name, Count: c.Count})
-	}
-	sort.SliceStable(snap.ToolCounts, func(i, j int) bool {
-		if snap.ToolCounts[i].Count != snap.ToolCounts[j].Count {
-			return snap.ToolCounts[i].Count > snap.ToolCounts[j].Count
-		}
-		return snap.ToolCounts[i].Name < snap.ToolCounts[j].Name
-	})
 
 	for _, a := range entries.Agents {
 		snap.Agents = append(snap.Agents, AgentItem{

@@ -106,22 +106,6 @@ func TestActivitySnapshotIsWidthIndependent(t *testing.T) {
 	}
 }
 
-func TestActivitySnapshotFoldsMCPCounts(t *testing.T) {
-	now := time.Unix(1748260800, 0).UTC()
-	snap := BuildActivitySnapshot(activityCtx(now, &transcript.Entries{ToolCounts: []transcript.ToolCount{
-		{Name: "read", Count: 3},
-		{Name: "mcp__nixos__nix", Count: 4},
-		{Name: "mcp__other__thing", Count: 1},
-	}}, nil))
-	got := map[string]int{}
-	for _, c := range snap.ToolCounts {
-		got[c.Name] = c.Count
-	}
-	if got["MCP"] != 5 || got["read"] != 3 || len(got) != 2 {
-		t.Errorf("ToolCounts = %v, want read=3 MCP=5", got)
-	}
-}
-
 func TestActivitySnapshotSurvivesNilTranscript(t *testing.T) {
 	snap := BuildActivitySnapshot(&Context{Now: time.Unix(1748260800, 0).UTC()})
 	if snap.Graces.TodoCompleteMs == 0 {

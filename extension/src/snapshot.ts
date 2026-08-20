@@ -64,11 +64,6 @@ export interface ActivityItem {
   endedAtMs?: number;
 }
 
-export interface ToolCountItem {
-  name: string;
-  count: number;
-}
-
 export interface AgentItem {
   name: string;
   model?: string;
@@ -95,7 +90,6 @@ export interface ActivityGraces {
 export interface ActivitySnapshot {
   graces: ActivityGraces;
   tools: ActivityItem[] | null;
-  toolCounts: ToolCountItem[] | null;
   agents: AgentItem[] | null;
   todos: TodoItem | null;
 }

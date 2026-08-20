@@ -7,22 +7,14 @@ import "time"
 
 // Entries is the result of parsing the transcript. Tool data is split:
 // Tools holds only currently-running tools (no tool_result yet) for the
-// running-tools row, while ToolCounts holds session-total completed counts
-// per tool name so the recent-tools row increments across the whole session.
+// running-tools row, while RecentTools holds the ones that finished recently
+// enough to still be worth showing.
 type Entries struct {
 	Requests    []Request
 	Tools       []Tool      // currently running (uncompleted)
 	RecentTools []Tool      // recently completed (EndedAt set), for a brief linger
-	ToolCounts  []ToolCount // completed, aggregated by name, session-total
 	Agents      []Agent
 	Todos       []TodoSnapshot
-}
-
-// ToolCount is a completed-tool aggregate: how many times a tool with this
-// name finished over the session.
-type ToolCount struct {
-	Name  string `json:"name"`
-	Count int    `json:"count"`
 }
 
 type Request struct {

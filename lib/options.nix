@@ -23,7 +23,7 @@ let
   # widget's `Name()` — and cross-checked against `dropPriority` in the same
   # file, which lists exactly the same seventeen names.
   #
-  # The activity-stack widgets (tools, toolsRecent, agents, todos) are
+  # The activity-stack widgets (tools, agents, todos) are
   # deliberately absent: they are a fixed, non-configurable stack sized by
   # `activityRows`, they are not in the registry, and `widgets.hide` is only
   # consulted by the row layout, never by the activity stack.

@@ -11,8 +11,8 @@ import "time"
 // enough to still be worth showing.
 type Entries struct {
 	Requests    []Request
-	Tools       []Tool      // currently running (uncompleted)
-	RecentTools []Tool      // recently completed (EndedAt set), for a brief linger
+	Tools       []Tool // currently running (uncompleted)
+	RecentTools []Tool // recently completed (EndedAt set), for a brief linger
 	Agents      []Agent
 	Todos       []TodoSnapshot
 }

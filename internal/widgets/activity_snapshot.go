@@ -19,10 +19,10 @@ import (
 //  3. no capping or truncation — those depend on the terminal width, which
 //     only the renderer knows.
 type ActivitySnapshot struct {
-	Graces     ActivityGraces  `json:"graces"`
-	Tools      []ActivityItem  `json:"tools"`
-	Agents     []AgentItem     `json:"agents"`
-	Todos      *TodoItem       `json:"todos"`
+	Graces ActivityGraces `json:"graces"`
+	Tools  []ActivityItem `json:"tools"`
+	Agents []AgentItem    `json:"agents"`
+	Todos  *TodoItem      `json:"todos"`
 }
 
 // ActivityGraces are the linger/staleness windows, in milliseconds, that the

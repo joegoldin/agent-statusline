@@ -73,7 +73,7 @@ func TestCacheRender(t *testing.T) {
 			provider: "openai-codex",
 			id:       "gpt-5.6-sol",
 			visible:  true,
-			want:     []string{"cache", "79.3%", "1.69M/2.13M", "35/41"},
+			want:     []string{"cache", "79.3%", "35/41"},
 		},
 		{
 			name:     "file missing",
@@ -126,66 +126,26 @@ func TestCacheHidesWithoutAProvider(t *testing.T) {
 	}
 }
 
-func TestCacheBarMatchesTheContextBarStyle(t *testing.T) {
+func TestCacheRowIsTheGlyphThePercentAndTheRequests(t *testing.T) {
+	// Three fields, and only two numbers, because the bar and the cached/total
+	// token pair were both the percentage restated: the bar is pct/100 by
+	// construction and the pair is the fraction it divides. What is left is the
+	// percentage (tokens) and the request ratio, which counts calls and so can
+	// disagree with it.
 	ctx := cacheCtx(t, cacheStatsFixture, "openai-codex", "gpt-5.6-sol")
-	ctx.Cfg.BarWidth = 8
-	spans, ok := Cache{}.RenderSpans(ctx)
-	if !ok {
-		t.Fatal("expected visible")
-	}
-	var bars int
-	for _, s := range spans {
-		if s.Kind != "bar" {
-			continue
+	for _, width := range []int{40, 80, 200} {
+		ctx.Width = width
+		spans, ok := Cache{}.RenderSpans(ctx)
+		if !ok {
+			t.Fatalf("width %d: expected visible", width)
 		}
-		bars++
-		if s.Fill < 0.792 || s.Fill > 0.794 {
-			t.Errorf("bar fill = %v, want ~0.793 (a fraction, not a percentage)", s.Fill)
+		for _, sp := range spans {
+			if sp.Kind == "bar" {
+				t.Errorf("width %d: cache row still emits a bar span", width)
+			}
 		}
-		if s.Cells != 8 {
-			t.Errorf("bar cells = %d, want 8 (config barWidth)", s.Cells)
-		}
-		if s.Style != render.BarBraille {
-			t.Errorf("bar style = %q, want %q", s.Style, render.BarBraille)
-		}
-	}
-	if bars != 1 {
-		t.Errorf("got %d bar spans, want exactly 1", bars)
-	}
-}
-
-func TestCompactCacheDropsTheBar(t *testing.T) {
-	ctx := cacheCtx(t, cacheStatsFixture, "openai-codex", "gpt-5.6-sol")
-	ctx.Width = 40 // below DefaultCompactWidth
-	spans, _ := Cache{}.RenderSpans(ctx)
-	for _, s := range spans {
-		if s.Kind == "bar" {
-			t.Fatal("compact cache widget still emits a bar span")
-		}
-	}
-}
-
-func TestHumanTokens(t *testing.T) {
-	tests := []struct {
-		n    int
-		want string
-	}{
-		{0, "0"},
-		{999, "999"},
-		{1_000, "1k"},
-		{1_690, "2k"},
-		{999_000, "999k"},
-		{999_499, "999k"},
-		{999_999, "1.00M"},
-		{1_000_000, "1.00M"},
-		{1_690_000, "1.69M"},
-		{2_130_000, "2.13M"},
-		{10_500_000, "10.5M"},
-		{105_000_000, "105M"},
-	}
-	for _, tc := range tests {
-		if got := humanTokens(tc.n); got != tc.want {
-			t.Errorf("humanTokens(%d) = %q, want %q", tc.n, got, tc.want)
+		if got, want := render.StripANSI(spans.ANSI()), "\uf1c0 cache 79.3% │ 35/41"; got != want {
+			t.Errorf("width %d: row = %q, want %q", width, got, want)
 		}
 	}
 }

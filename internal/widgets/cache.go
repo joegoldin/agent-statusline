@@ -11,7 +11,12 @@ const cacheGlyph = "\uf1c0 " // nf-fa-database
 
 // Cache renders the prompt-cache accounting the pi cache-optimizer extension
 // keeps for the active model: what share of input tokens came back from the
-// provider's cache, and how many requests hit it at all.
+// provider's cache, and how many requests hit it at all. Two figures, because
+// they measure different things -- a session can cache 93% of its tokens while
+// missing on 4 of 82 calls, since the misses are the small ones.
+//
+// The sidecar totals are per day and per model, not per session, so this is
+// "today, on this model" and it resets at midnight.
 type Cache struct{}
 
 func (Cache) Name() string { return "cache" }
@@ -36,46 +41,16 @@ func (Cache) RenderSpans(ctx *Context) (render.Spans, bool) {
 	spans := render.Spans{
 		render.Text(intent, fmt.Sprintf("%scache %.1f%%", cacheGlyph, pct)),
 	}
-	// Compact terminal: the bar and the token pair are the widest parts and
-	// say the same thing the percentage already did.
-	if !ctx.Compact() {
-		width := ctx.Cfg.BarWidth
-		if width <= 0 {
-			width = 10
-		}
-		spans = append(spans,
-			render.Text(render.IntentText, rowSeparator),
-			render.Bar(pct/100, width, render.BarBraille),
-			render.Text(render.IntentText, rowSeparator),
-			render.Text(render.IntentDim, humanTokens(t.CachedInputTokens)+"/"+humanTokens(t.TotalInputTokens)))
-	}
+	// No bar and no token pair, at any width. Both were the percentage a second
+	// and third time -- the bar is pct/100 by construction, and the token pair
+	// is the very fraction the percentage divides -- so the row spent four
+	// columns of figures saying one thing. The request ratio below is the only
+	// number here that is not derivable from the percentage: it counts calls,
+	// not tokens, which is why it can read 78/82 while the tokens read 93%.
 	if t.TotalRequests > 0 {
 		spans = append(spans,
 			render.Text(render.IntentText, rowSeparator),
 			render.Text(render.IntentMeta, strconv.Itoa(t.HitRequests)+"/"+strconv.Itoa(t.TotalRequests)))
 	}
 	return spans, true
-}
-
-// humanTokens compacts a token count to three significant digits, so the
-// cached/total pair reads as a ratio you can check by eye. It is deliberately
-// not formatTokens: that one's single decimal ("1.7M") is pinned by the Claude
-// golden files and loses the digit that makes the comparison legible.
-func humanTokens(n int) string {
-	if n < 1_000 {
-		return strconv.Itoa(n)
-	}
-	// Rounded thousands, unless the rounding carries into millions.
-	if k := (n + 500) / 1_000; k < 1_000 {
-		return strconv.Itoa(k) + "k"
-	}
-	m := float64(n) / 1_000_000
-	switch {
-	case m >= 100:
-		return fmt.Sprintf("%.0fM", m)
-	case m >= 10:
-		return fmt.Sprintf("%.1fM", m)
-	default:
-		return fmt.Sprintf("%.2fM", m)
-	}
 }

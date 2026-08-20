@@ -140,44 +140,6 @@
           "intent": "text"
         },
         {
-          "kind": "bar",
-          "fill": 0.7934272300469484,
-          "cells": 10,
-          "style": "braille"
-        },
-        {
-          "kind": "text",
-          "text": " │ ",
-          "intent": "text"
-        },
-        {
-          "kind": "text",
-          "text": "1.69M/2.13M",
-          "intent": "dim"
-        },
-        {
-          "kind": "text",
-          "text": " │ ",
-          "intent": "text"
-        },
-        {
-          "kind": "text",
-          "text": "35/41",
-          "intent": "meta"
-        }
-      ],
-      "compact": [
-        {
-          "kind": "text",
-          "text": " cache 79.3%",
-          "intent": "ok"
-        },
-        {
-          "kind": "text",
-          "text": " │ ",
-          "intent": "text"
-        },
-        {
           "kind": "text",
           "text": "35/41",
           "intent": "meta"

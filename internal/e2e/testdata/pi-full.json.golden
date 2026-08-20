@@ -30,11 +30,10 @@
       "cost"
     ],
     "row3": [
-      "autoMode"
-    ],
-    "row4": [
+      "autoMode",
       "cache"
     ],
+    "row4": [],
     "hide": [],
     "dropPriority": [
       "autoMode",

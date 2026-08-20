@@ -57,8 +57,11 @@ let
         "pr"
         "cost"
       ];
-      row3 = [ "autoMode" ];
-      row4 = [ "cache" ];
+      row3 = [
+        "autoMode"
+        "cache"
+      ];
+      row4 = [ ];
       hide = [ ];
     };
     gitCacheTtlSeconds = 5;

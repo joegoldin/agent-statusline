@@ -148,10 +148,10 @@ func TestBuildSnapshotsTheExtraRows(t *testing.T) {
 	if snap, ok := s.Widgets["cache"]; !ok || snap.Visible {
 		t.Errorf("cache snapshot = %+v, want present and hidden", snap)
 	}
-	if want := []string{"autoMode"}; !reflect.DeepEqual(s.Config.Row3, want) {
+	if want := []string{"autoMode", "cache"}; !reflect.DeepEqual(s.Config.Row3, want) {
 		t.Errorf("Config.Row3 = %v, want %v", s.Config.Row3, want)
 	}
-	if want := []string{"cache"}; !reflect.DeepEqual(s.Config.Row4, want) {
-		t.Errorf("Config.Row4 = %v, want %v", s.Config.Row4, want)
+	if len(s.Config.Row4) != 0 {
+		t.Errorf("Config.Row4 = %v, want empty", s.Config.Row4)
 	}
 }

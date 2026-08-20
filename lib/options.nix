@@ -144,23 +144,31 @@ in
         };
         row3 = mkOption {
           type = types.listOf (types.enum widgetNames);
-          default = [ "autoMode" ];
+          default = [
+            "autoMode"
+            "cache"
+          ];
           description = ''
-            Third row — the pi-automode permission tally. Rendered on a
-            line of its own because the widget draws several figures.
-            Empty to switch the row off; it hides itself anyway unless
-            pi-automode is publishing its status text, which it only does
-            with `PI_AUTOMODE_NO_STATUS_SLOT = "1"` in the environment.
+            Third row — what the agent is being allowed to do, and what its
+            prompt cache is doing. Both widgets draw several figures each, so
+            they get a line below the dashboard rather than a column inside it,
+            but they share that line: one widget per row left a mostly empty
+            line under a mostly empty line.
+
+            Each hides on its own terms and an all-hidden row costs no line at
+            all. `autoMode` needs pi-automode to be publishing its status text,
+            which it does only with `PI_AUTOMODE_NO_STATUS_SLOT = "1"` in the
+            environment; `cache` needs the cache-optimizer extension to have
+            recorded traffic for the active model. Empty to switch the row off.
           '';
         };
         row4 = mkOption {
           type = types.listOf (types.enum widgetNames);
-          default = [ "cache" ];
+          default = [ ];
           description = ''
-            Fourth row — prompt-cache hit rate for the active model, read
-            from the pi cache-optimizer extension's sidecar in
-            `$PI_CODING_AGENT_DIR`. Empty to switch the row off; it hides
-            itself when that extension has recorded nothing for the model.
+            Fourth row — empty by default, and a spare rather than a leftover.
+            Row 3 holds both multi-figure widgets; this exists for a host that
+            wants one of them, or something added later, on a line of its own.
           '';
         };
         hide = mkOption {

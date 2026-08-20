@@ -87,13 +87,15 @@ func TestLoadMalformedFallsBackToDefaults(t *testing.T) {
 	}
 }
 
-func TestDefaultsPlaceTheExtraRows(t *testing.T) {
+func TestDefaultsPutBothExtraWidgetsOnOneRow(t *testing.T) {
+	// One multi-figure widget per row left a mostly empty line under a mostly
+	// empty line. Row 4 stays as a spare, not a leftover.
 	c := Defaults()
-	if want := []string{"autoMode"}; !reflect.DeepEqual(c.Widgets.Row3, want) {
+	if want := []string{"autoMode", "cache"}; !reflect.DeepEqual(c.Widgets.Row3, want) {
 		t.Errorf("Row3 = %v, want %v", c.Widgets.Row3, want)
 	}
-	if want := []string{"cache"}; !reflect.DeepEqual(c.Widgets.Row4, want) {
-		t.Errorf("Row4 = %v, want %v", c.Widgets.Row4, want)
+	if len(c.Widgets.Row4) != 0 {
+		t.Errorf("Row4 = %v, want empty", c.Widgets.Row4)
 	}
 }
 

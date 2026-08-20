@@ -50,8 +50,12 @@ func Defaults() Config {
 			// into row 2 would push the conversation state off a narrow
 			// terminal. Both hide themselves when their source is absent, and
 			// an empty row costs no line.
-			Row3: []string{"autoMode"},
-			Row4: []string{"cache"},
+			// Both on one line: each draws several figures, so neither
+			// belongs in a dashboard column, but one per row left a mostly
+			// empty line under a mostly empty line. An all-hidden row costs
+			// no line (packLines returns nil), so this collapses cleanly.
+			Row3: []string{"autoMode", "cache"},
+			Row4: nil,
 			Hide: []string{},
 		},
 		TokenFormat:             "compact",

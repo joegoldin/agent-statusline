@@ -149,9 +149,22 @@ func (o overlayConfig) applyTo(c *Config) {
 	}
 }
 
-// ResolvePath returns the effective config path, honoring CLAUDE_STATUSLINE_CONFIG
-// and CLAUDE_CONFIG_DIR. Fallback: $HOME/.claude/statusline-config.json.
+// ResolvePath returns the effective config path, honoring
+// AGENT_STATUSLINE_CONFIG, CLAUDE_STATUSLINE_CONFIG and CLAUDE_CONFIG_DIR.
+// Fallback: $HOME/.claude/statusline-config.json.
+//
+// AGENT_STATUSLINE_CONFIG is checked first because it is the only one a
+// non-Claude host can set truthfully. The pi wrapper exports it alongside
+// AGENT_STATUSLINE_BIN; every remaining name below carries Claude Code's
+// directory layout in it, and none of them describes where pi keeps anything.
+// Under pi the fallback is not merely wrong, it is unreachable: the jail binds
+// ~/.pi/agent and not ~/.claude, so Load() saw no file and every session
+// rendered Defaults() -- ten-cell bars and the default rows, whatever the
+// host had configured.
 func ResolvePath() string {
+	if p := os.Getenv("AGENT_STATUSLINE_CONFIG"); p != "" {
+		return p
+	}
 	if p := os.Getenv("CLAUDE_STATUSLINE_CONFIG"); p != "" {
 		return p
 	}

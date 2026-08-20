@@ -115,3 +115,28 @@ func TestLoadEmptiesARowWhenAsked(t *testing.T) {
 		t.Errorf("Row4 = %v", c.Widgets.Row4)
 	}
 }
+
+func TestResolvePathPrefersTheAgentNeutralVariable(t *testing.T) {
+	// pi's wrapper exports AGENT_STATUSLINE_CONFIG. Nothing read it, so every
+	// jailed pi session fell through to ~/.claude, which the jail does not
+	// bind, and rendered Defaults().
+	t.Setenv("AGENT_STATUSLINE_CONFIG", "/agent/config.json")
+	t.Setenv("CLAUDE_STATUSLINE_CONFIG", "/claude/config.json")
+	t.Setenv("CLAUDE_CONFIG_DIR", "/claude-dir")
+	if got := ResolvePath(); got != "/agent/config.json" {
+		t.Errorf("ResolvePath() = %q, want /agent/config.json", got)
+	}
+}
+
+func TestResolvePathKeepsTheClaudeVariables(t *testing.T) {
+	t.Setenv("AGENT_STATUSLINE_CONFIG", "")
+	t.Setenv("CLAUDE_STATUSLINE_CONFIG", "/claude/config.json")
+	if got := ResolvePath(); got != "/claude/config.json" {
+		t.Errorf("ResolvePath() = %q, want /claude/config.json", got)
+	}
+	t.Setenv("CLAUDE_STATUSLINE_CONFIG", "")
+	t.Setenv("CLAUDE_CONFIG_DIR", "/claude-dir")
+	if got := ResolvePath(); got != "/claude-dir/statusline-config.json" {
+		t.Errorf("ResolvePath() = %q, want /claude-dir/statusline-config.json", got)
+	}
+}

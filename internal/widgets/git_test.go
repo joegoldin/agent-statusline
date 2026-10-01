@@ -80,3 +80,15 @@ func TestGitWidgetHidesWhenNoRepo(t *testing.T) {
 		t.Errorf("expected hidden when no git")
 	}
 }
+
+func TestGitWidgetRendersLabelVerbatim(t *testing.T) {
+	w := &Git{}
+	g := &gitcache.Git{Label: "󱗆 voxoqmm (main~1)"}
+	out, vis := w.Render(gitCtx(g, "feat"))
+	if !vis || !strings.Contains(out, "󱗆 voxoqmm (main~1)") || !strings.Contains(out, "feat") {
+		t.Errorf("got %q", out)
+	}
+	if strings.Contains(out, gitGlyph) {
+		t.Errorf("label should replace the git glyph, got %q", out)
+	}
+}

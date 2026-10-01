@@ -89,10 +89,11 @@ func main() {
 
 	ctx.GitProvider = memoize(func() *gitcache.Git {
 		c := &gitcache.Cache{
-			Dir:        filepath.Join(cacheRoot, "git"),
-			TTLSeconds: cfg.GitCacheTTLSeconds,
-			Runner:     gitcache.DefaultRunner,
-			Now:        time.Now,
+			Dir:         filepath.Join(cacheRoot, "git"),
+			TTLSeconds:  cfg.GitCacheTTLSeconds,
+			Runner:      gitcache.DefaultRunner,
+			LabelRunner: gitcache.DefaultLabelRunner,
+			Now:         time.Now,
 		}
 		g, err := c.Query(status.CWD)
 		if err != nil {

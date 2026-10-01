@@ -148,3 +148,48 @@ func requireNoAncestorGitDir(t *testing.T, dir string) {
 		d = parent
 	}
 }
+
+func TestQueryPrefersLabelRunner(t *testing.T) {
+	tmp := t.TempDir()
+	repoDir := makeRepo(t, tmp)
+	gitCalls := 0
+	c := &Cache{
+		Dir:        filepath.Join(tmp, "cache"),
+		TTLSeconds: 60,
+		Runner: func(string) (string, error) {
+			gitCalls++
+			return mockPorcelain(), nil
+		},
+		LabelRunner: func(string) (string, error) { return "󱗆 voxoqmm (main~1)", nil },
+		Now:         time.Now,
+	}
+	g, err := c.Query(repoDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Label != "󱗆 voxoqmm (main~1)" || g.Branch != "" {
+		t.Errorf("got %+v", g)
+	}
+	if gitCalls != 0 {
+		t.Errorf("git ran %d times despite a label", gitCalls)
+	}
+}
+
+func TestQueryFallsBackWhenLabelRunnerFails(t *testing.T) {
+	tmp := t.TempDir()
+	repoDir := makeRepo(t, tmp)
+	c := &Cache{
+		Dir:         filepath.Join(tmp, "cache"),
+		TTLSeconds:  60,
+		Runner:      func(string) (string, error) { return mockPorcelain(), nil },
+		LabelRunner: func(string) (string, error) { return "", os.ErrNotExist },
+		Now:         time.Now,
+	}
+	g, err := c.Query(repoDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Label != "" || g.Branch != "main" {
+		t.Errorf("got %+v", g)
+	}
+}

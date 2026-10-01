@@ -15,7 +15,11 @@ type Cache struct {
 	Dir        string
 	TTLSeconds int
 	Runner     func(repoDir string) (string, error)
-	Now        func() time.Time
+	// LabelRunner, when set, is tried before Runner. A non-empty result
+	// becomes Git.Label and Runner is skipped; an error or empty output falls
+	// back to Runner.
+	LabelRunner func(cwd string) (string, error)
+	Now         func() time.Time
 }
 
 type cachedEntry struct {
@@ -42,6 +46,20 @@ func DefaultRunner(repoDir string) (string, error) {
 	return string(out), err
 }
 
+// DefaultLabelRunner renders the repo through jj-starship, which reads both
+// jj and plain git repos without snapshotting the jj working copy. In
+// colocated jj repos git's HEAD is always detached, so `git status` alone can
+// only show a bare hash; jj-starship shows the change id and bookmarks.
+func DefaultLabelRunner(cwd string) (string, error) {
+	out, err := exec.Command("jj-starship", "--no-color", "--cwd", cwd).Output()
+	if err != nil {
+		return "", err
+	}
+	// Drop only the leading "on "; the --no-*-prefix flags would also drop
+	// the jj/git symbol.
+	return strings.TrimPrefix(strings.TrimSpace(string(out)), "on "), nil
+}
+
 // Query returns parsed git state for the repo containing cwd, or nil if cwd
 // is not inside a git repository. Reads from cache if TTL hasn't elapsed and
 // neither .git/HEAD nor .git/index has changed mtime since the cached entry.
@@ -60,12 +78,10 @@ func (c *Cache) Query(cwd string) (*Git, error) {
 			return &g, nil
 		}
 	}
-	repoDir := repoRoot(gitDir, cwd)
-	out, err := c.Runner(repoDir)
+	parsed, err := c.run(gitDir, cwd)
 	if err != nil {
 		return nil, err
 	}
-	parsed := ParsePorcelainV2(out)
 	entry := cachedEntry{
 		Stamp:      c.Now(),
 		HEADmtime:  modTime(headInfo),
@@ -74,6 +90,19 @@ func (c *Cache) Query(cwd string) (*Git, error) {
 	}
 	c.writeCache(cachePath, entry)
 	return &parsed, nil
+}
+
+func (c *Cache) run(gitDir, cwd string) (Git, error) {
+	if c.LabelRunner != nil {
+		if label, err := c.LabelRunner(cwd); err == nil && label != "" {
+			return Git{Label: label}, nil
+		}
+	}
+	out, err := c.Runner(repoRoot(gitDir, cwd))
+	if err != nil {
+		return Git{}, err
+	}
+	return ParsePorcelainV2(out), nil
 }
 
 func resolveGitDir(cwd string) (string, bool) {

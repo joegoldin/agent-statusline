@@ -8,6 +8,9 @@ import (
 )
 
 type Git struct {
+	// Label is a pre-rendered repo summary from Cache.LabelRunner. When set,
+	// the remaining fields are zero and the widget shows Label as-is.
+	Label     string
 	Branch    string
 	SHA       string
 	Upstream  string

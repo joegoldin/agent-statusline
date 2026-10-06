@@ -44,7 +44,7 @@ func Defaults() Config {
 			// windows close out the row).
 			Row1: []string{"model", "cwd", "git", "duration", "usage5h", "usage7d"},
 			// Row 2 — conversation state (what's happening this session).
-			Row2: []string{"context", "tokens", "burnRate", "voice", "compaction", "pr", "cost"},
+			Row2: []string{"context", "tokens", "burnRate", "voice", "compaction", "pr", "lsp", "cost"},
 			// Rows 3 and 4 each carry one widget that draws several figures of
 			// its own, so they get a line rather than a slot: crowding them
 			// into row 2 would push the conversation state off a narrow

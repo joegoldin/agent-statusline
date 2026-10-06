@@ -146,3 +146,38 @@ func TestDecodePiCarriesAutoModeAndProviderThrough(t *testing.T) {
 		t.Errorf("AutoMode = %q, want %q", s.AutoMode, want)
 	}
 }
+
+func TestDecodePiCarriesSubscriptionAndLSPThrough(t *testing.T) {
+	const raw = `{
+  "harness": "pi",
+  "subscription": true,
+  "lsp": "\u001b[32mLSP Active: gopls\u001b[39m",
+  "rate_limits": {"five_hour": {"used_percentage": 44, "resets_at": 1748271600}}
+}`
+	s, err := DecodePi(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("DecodePi: %v", err)
+	}
+	if !s.Subscription {
+		t.Error("Subscription = false, want true")
+	}
+	// Verbatim, colour and all: stripping it is the widget's parse.
+	if want := "\x1b[32mLSP Active: gopls\x1b[39m"; s.LSP != want {
+		t.Errorf("LSP = %q, want %q", s.LSP, want)
+	}
+	if s.RateLimits == nil || s.RateLimits.FiveHour == nil || s.RateLimits.FiveHour.ResetsAt != 1748271600 {
+		t.Errorf("RateLimits = %+v", s.RateLimits)
+	}
+}
+
+func TestDecodePiDefaultsToNoSubscription(t *testing.T) {
+	// Absent means unknown, and unknown must keep cost visible: an API-key
+	// session is billed for every token.
+	s, err := DecodePi(strings.NewReader(samplePiJSON))
+	if err != nil {
+		t.Fatalf("DecodePi: %v", err)
+	}
+	if s.Subscription || s.LSP != "" {
+		t.Errorf("Subscription = %v, LSP = %q, want false and empty", s.Subscription, s.LSP)
+	}
+}

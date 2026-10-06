@@ -21,7 +21,7 @@ func everySpanWidget() []Widget {
 		Model{}, CWD{}, Git{}, Duration{}, Tokens{}, Voice{},
 		Compaction{}, PR{}, Cost{}, Effort{}, SessionName{},
 		ContextBar{}, Usage5h{}, Usage7d{}, BurnRate{},
-		AutoMode{}, Cache{},
+		AutoMode{}, Cache{}, LSP{},
 	}
 }
 
@@ -90,6 +90,7 @@ func fixtureContext(t *testing.T) *Context {
 			SessionName: "native-pi",
 			Model:       input.Model{ID: "gpt-5.6-sol", DisplayName: "Sol", Provider: "openai-codex"},
 			AutoMode:    "AM● a:105 d:4 ca:89 cd:4",
+			LSP:         "LSP Active: gopls · LSP Failed: pyright",
 			Workspace:   input.Workspace{GitWorktree: "feature"},
 			Effort:      &input.Effort{Level: "xhigh"},
 			Cost:        &input.Cost{TotalCostUSD: 4.20, TotalDurationMS: 4_530_000},

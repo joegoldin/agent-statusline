@@ -27,13 +27,22 @@ async function waitFor(fn: () => unknown, timeoutMs = 10_000, stepMs = 10) {
 
 import {
   AUTO_MODE_STATUS_CHANNEL,
+  LSP_STATUS_SLOT,
+  PI_USAGE_REPORT_CHANNEL,
+  USAGE_STATUS_SLOT,
+  absorbedStatusKeys,
+  activeRateLimits,
   autoModeText,
   buildPayload,
   newSessionState,
+  planUsageFromReport,
   rateLimitsFromHeaders,
+  rateLimitsFromUsageBuckets,
   runBinary,
   sessionTotalsFromEntries,
   type PiExtensionContext,
+  type PiUsageBucket,
+  type PiUsageReport,
   type SessionState,
 } from "./statusline";
 
@@ -90,6 +99,24 @@ describe("buildPayload", () => {
     // Unset rather than empty: JSON.stringify drops it, and the entrypoint test
     // below checks it never reaches the binary.
     expect(buildPayload(ctx, state(), 0).auto_mode).toBeUndefined();
+  });
+
+  it("marks a subscription and carries pi-lens's status text verbatim", () => {
+    const p = buildPayload(
+      ctx,
+      state({ planUsage: { subscription: true }, lsp: "\x1b[32mLSP Active: gopls\x1b[39m" }),
+      0,
+    );
+    expect(p.subscription).toBe(true);
+    expect(p.lsp).toBe("\x1b[32mLSP Active: gopls\x1b[39m");
+  });
+
+  it("leaves subscription unset on an API key, never false", () => {
+    // Absent is "not known to be a plan"; JSON.stringify drops it, so the
+    // wire shape for an API-key session is the same as before pi-usage.
+    const p = buildPayload(ctx, state({ planUsage: { subscription: false } }), 0);
+    expect(p.subscription).toBeUndefined();
+    expect(p.lsp).toBeUndefined();
   });
 
   it("falls back to the model id when pi reports no display name", () => {
@@ -219,6 +246,178 @@ describe("autoModeText", () => {
       expect(autoModeText(data)).toBe(want as any);
     });
   }
+});
+
+// The two ChatGPT plan windows and the app allowance, shaped as pi-usage's
+// openai-companion-usage.ts normalizeWindow builds them.
+const planBuckets: PiUsageBucket[] = [
+  { id: "plan-primary", label: "Subscription limit", groupId: "chatgpt-plan", used: 44, remaining: 56, limit: 100, unit: "percent", windowMinutes: 300, resetsAt: 1748271600 },
+  { id: "plan-secondary", label: "Subscription limit", groupId: "chatgpt-plan", used: 56, remaining: 44, limit: 100, unit: "percent", windowMinutes: 10080, resetsAt: 1748538000 },
+  { id: "app-primary", label: "Subscription limit", groupId: "chatgpt-app", used: 97, remaining: 3, limit: 100, unit: "percent", windowMinutes: 300, resetsAt: 1748265000 },
+  { id: "app-secondary", label: "Subscription limit", groupId: "chatgpt-app", used: 99, remaining: 1, limit: 100, unit: "percent", windowMinutes: 10080, resetsAt: 1748700000 },
+];
+
+function report(over: Partial<PiUsageReport> = {}): PiUsageReport {
+  return {
+    providerId: "openai",
+    providerName: "ChatGPT",
+    capturedAt: 1748260800000,
+    source: "openai-chatgpt-companion",
+    semantics: { kind: "consumer-subscription", label: "ChatGPT plan and app limits" },
+    buckets: planBuckets,
+    metrics: [],
+    ...over,
+  };
+}
+
+describe("rateLimitsFromUsageBuckets", () => {
+  it("maps the plan windows by length and ignores the ChatGPT app's allowance", () => {
+    // The app windows are fuller than the plan's, so a mapping that let them
+    // in would show 97% and 99% here.
+    expect(rateLimitsFromUsageBuckets(planBuckets)).toEqual({
+      five_hour: { used_percentage: 44, resets_at: 1748271600 },
+      seven_day: { used_percentage: 56, resets_at: 1748538000 },
+    });
+  });
+
+  it("keeps resetsAt in seconds, the unit the wire already uses", () => {
+    const limits = rateLimitsFromUsageBuckets([planBuckets[0]!]);
+    expect(limits?.five_hour?.resets_at).toBe(1748271600);
+  });
+
+  it("takes the fullest window when several fall in one slot", () => {
+    const limits = rateLimitsFromUsageBuckets([
+      { id: "codex:primary", label: "Codex", groupId: "codex", used: 20, unit: "percent", windowMinutes: 300, resetsAt: 1 },
+      { id: "spark:primary", label: "Spark", groupId: "spark", used: 70, unit: "percent", windowMinutes: 300, resetsAt: 2 },
+      { id: "late:primary", label: "Late", groupId: "late", used: 10, unit: "percent", windowMinutes: 300, resetsAt: 3 },
+    ]);
+    expect(limits).toEqual({ five_hour: { used_percentage: 70, resets_at: 2 } });
+  });
+
+  it("drops what has no slot: other lengths, other units, no used figure, no length", () => {
+    const limits = rateLimitsFromUsageBuckets([
+      { id: "daily", label: "Daily", used: 10, unit: "percent", windowMinutes: 24 * 60 },
+      { id: "monthly", label: "Monthly", used: 10, unit: "percent", windowMinutes: 30 * 24 * 60 },
+      { id: "usd", label: "Spend", used: 12.5, unit: "usd", windowMinutes: 300 },
+      { id: "remaining-only", label: "Left", remaining: 40, unit: "percent", windowMinutes: 300 },
+      { id: "no-length", label: "Window", used: 30, unit: "percent" },
+    ]);
+    expect(limits).toBeUndefined();
+  });
+
+  it("puts the boundaries where the slots end", () => {
+    const at = (windowMinutes: number) =>
+      rateLimitsFromUsageBuckets([{ id: "w", label: "w", used: 1, unit: "percent", windowMinutes }]);
+    expect(Object.keys(at(360) ?? {})).toEqual(["five_hour"]);
+    expect(at(361)).toBeUndefined();
+    expect(Object.keys(at(6 * 24 * 60) ?? {})).toEqual(["seven_day"]);
+    expect(Object.keys(at(8 * 24 * 60) ?? {})).toEqual(["seven_day"]);
+    expect(at(8 * 24 * 60 + 1)).toBeUndefined();
+  });
+
+  it("returns undefined for no buckets at all", () => {
+    expect(rateLimitsFromUsageBuckets(undefined)).toBeUndefined();
+    expect(rateLimitsFromUsageBuckets([])).toBeUndefined();
+  });
+});
+
+describe("planUsageFromReport", () => {
+  it("reads a ChatGPT plan as a subscription with its windows", () => {
+    expect(planUsageFromReport({ report: report() })).toEqual({
+      subscription: true,
+      rateLimits: {
+        five_hour: { used_percentage: 44, resets_at: 1748271600 },
+        seven_day: { used_percentage: 56, resets_at: 1748538000 },
+      },
+    });
+  });
+
+  it("reads an API-key balance as no subscription and no windows", () => {
+    const usage = planUsageFromReport({
+      report: report({
+        providerId: "openrouter",
+        semantics: { kind: "api-key", label: "OpenRouter key" },
+        buckets: [{ id: "key-limit", label: "Key limit", remaining: 4.2, unit: "usd" }],
+      }),
+    });
+    expect(usage).toEqual({ subscription: false, rateLimits: undefined });
+  });
+
+  const cleared: Array<[string, unknown]> = [
+    ["pi-usage clearing its status", { report: undefined }],
+    ["a report with no semantics", { report: { buckets: planBuckets } }],
+    ["a bare report instead of an envelope", report()],
+    ["nothing at all", undefined],
+    ["null", null],
+  ];
+  for (const [name, data] of cleared) {
+    it(`clears on ${name}`, () => {
+      expect(planUsageFromReport(data)).toBeUndefined();
+    });
+  }
+});
+
+describe("activeRateLimits", () => {
+  const headers = { five_hour: { used_percentage: 12, resets_at: 1 } };
+  const plan = { five_hour: { used_percentage: 44, resets_at: 2 } };
+
+  it("lets Anthropic's headers win while their provider is the current one", () => {
+    const s = state({ rateLimits: headers, rateLimitsProvider: "anthropic", planUsage: { subscription: true, rateLimits: plan } });
+    expect(activeRateLimits(s, "anthropic")).toEqual({ rateLimits: headers, fromPlanUsage: false });
+  });
+
+  it("hands over to pi-usage once the session moves to another provider", () => {
+    const s = state({ rateLimits: headers, rateLimitsProvider: "anthropic", planUsage: { subscription: true, rateLimits: plan } });
+    expect(activeRateLimits(s, "openai-codex")).toEqual({ rateLimits: plan, fromPlanUsage: true });
+  });
+
+  it("falls back to pi-usage before Anthropic's first response", () => {
+    const s = state({ planUsage: { subscription: true, rateLimits: plan } });
+    expect(activeRateLimits(s, "anthropic")).toEqual({ rateLimits: plan, fromPlanUsage: true });
+  });
+
+  it("drops another provider's headers rather than mislabel them", () => {
+    const s = state({ rateLimits: headers, rateLimitsProvider: "anthropic" });
+    expect(activeRateLimits(s, "openai-codex")).toEqual({ rateLimits: undefined, fromPlanUsage: false });
+  });
+
+  it("puts the chosen limits on the wire", () => {
+    const s = state({ rateLimits: headers, rateLimitsProvider: "anthropic", planUsage: { subscription: true, rateLimits: plan } });
+    const codex = { ...ctx, model: { id: "gpt-5.6-sol", provider: "openai-codex" } };
+    expect(buildPayload(codex, s, 0).rate_limits).toEqual(plan);
+  });
+});
+
+describe("absorbedStatusKeys", () => {
+  const plan = { five_hour: { used_percentage: 44, resets_at: 2 } };
+
+  it("always absorbs pi-lens's line, which the lsp widget draws", () => {
+    expect([...absorbedStatusKeys(state(), "openai-codex")]).toEqual([LSP_STATUS_SLOT]);
+  });
+
+  it("absorbs pi-usage's line while its plan windows are on the usage widgets", () => {
+    const s = state({ planUsage: { subscription: true, rateLimits: plan } });
+    expect(absorbedStatusKeys(s, "openai-codex").has(USAGE_STATUS_SLOT)).toBe(true);
+  });
+
+  it("keeps pi-usage's line for an API-key balance, which no widget draws", () => {
+    const s = state({ planUsage: { subscription: false } });
+    expect(absorbedStatusKeys(s, "openrouter").has(USAGE_STATUS_SLOT)).toBe(false);
+  });
+
+  it("keeps pi-usage's line for a plan with no window the widgets can show", () => {
+    const s = state({ planUsage: { subscription: true } });
+    expect(absorbedStatusKeys(s, "github-copilot").has(USAGE_STATUS_SLOT)).toBe(false);
+  });
+
+  it("keeps pi-usage's line while Anthropic's headers are what the widgets show", () => {
+    const s = state({
+      rateLimits: { five_hour: { used_percentage: 12, resets_at: 1 } },
+      rateLimitsProvider: "anthropic",
+      planUsage: { subscription: true, rateLimits: plan },
+    });
+    expect(absorbedStatusKeys(s, "anthropic").has(USAGE_STATUS_SLOT)).toBe(false);
+  });
 });
 
 describe("rateLimitsFromHeaders", () => {
@@ -454,6 +653,43 @@ describe("extension entrypoint", () => {
 
       await pi.emit("session_shutdown", { type: "session_shutdown" }, ctx);
       expect(pi.busHandlers.has(AUTO_MODE_STATUS_CHANNEL)).toBe(false);
+    } finally {
+      delete process.env.AGENT_STATUSLINE_BIN;
+    }
+  });
+
+  it("takes plan usage off pi-usage's report channel", async () => {
+    const bin = recordingBinary();
+    process.env.AGENT_STATUSLINE_BIN = bin.path;
+    try {
+      const { default: register } = await import("./statusline");
+      const pi = fakePi();
+      register(pi);
+      const { ctx } = fakeCtx();
+      await pi.emit("session_start", { type: "session_start", reason: "startup" }, ctx);
+      await waitFor(() => expect(bin.payloads().length).toBe(1));
+      expect(pi.busHandlers.has(PI_USAGE_REPORT_CHANNEL)).toBe(true);
+
+      pi.events.emit(PI_USAGE_REPORT_CHANNEL, { report: report() });
+      await waitFor(() => {
+        const wire = bin.payloads().at(-1);
+        expect(wire.subscription).toBe(true);
+        expect(wire.rate_limits).toEqual({
+          five_hour: { used_percentage: 44, resets_at: 1748271600 },
+          seven_day: { used_percentage: 56, resets_at: 1748538000 },
+        });
+      });
+
+      // pi-usage clearing its slot has to clear ours, not freeze the plan.
+      pi.events.emit(PI_USAGE_REPORT_CHANNEL, { report: undefined });
+      await waitFor(() => {
+        const wire = bin.payloads().at(-1);
+        expect(wire).not.toHaveProperty("subscription");
+        expect(wire).not.toHaveProperty("rate_limits");
+      });
+
+      await pi.emit("session_shutdown", { type: "session_shutdown" }, ctx);
+      expect(pi.busHandlers.has(PI_USAGE_REPORT_CHANNEL)).toBe(false);
     } finally {
       delete process.env.AGENT_STATUSLINE_BIN;
     }

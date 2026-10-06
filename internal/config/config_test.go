@@ -99,6 +99,14 @@ func TestDefaultsPutBothExtraWidgetsOnOneRow(t *testing.T) {
 	}
 }
 
+func TestDefaultsPutLSPJustBeforeCost(t *testing.T) {
+	c := Defaults()
+	want := []string{"context", "tokens", "burnRate", "voice", "compaction", "pr", "lsp", "cost"}
+	if !reflect.DeepEqual(c.Widgets.Row2, want) {
+		t.Errorf("Row2 = %v, want %v", c.Widgets.Row2, want)
+	}
+}
+
 func TestLoadEmptiesARowWhenAsked(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "statusline-config.json")
 	// An empty list is how a row is turned off, so it has to survive the merge

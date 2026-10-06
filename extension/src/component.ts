@@ -33,11 +33,22 @@ export interface PiUIContext {
 export interface InstallDeps {
   /** Called when something happened that the snapshot cannot know about. */
   onDataStale?: () => void;
+  /**
+   * Other extensions' status keys whose text the snapshot already draws as
+   * widgets, asked on every frame because the answer follows the session.
+   */
+  absorbedStatusKeys?: () => ReadonlySet<string>;
   now?: () => number;
 }
 
 export interface StatuslineHandle {
   setSnapshot(s: Snapshot): void;
+  /**
+   * Another extension's setStatus text. Taking the footer made this component
+   * the only reader of pi's status map, so a payload field built from one of
+   * those lines has to come through here.
+   */
+  extensionStatus(key: string): string | undefined;
   dispose(): void;
 }
 
@@ -60,6 +71,7 @@ const DEFAULT_INTERVAL_MS = 1000;
 export function installStatusline(ctx: PiUIContext, deps: InstallDeps): StatuslineHandle {
   const noop: StatuslineHandle = {
     setSnapshot() {},
+    extensionStatus: () => undefined,
     dispose() {},
   };
   // setWidget and setFooter are stubbed headless (runner.ts) and setFooter is
@@ -97,18 +109,26 @@ export function installStatusline(ctx: PiUIContext, deps: InstallDeps): Statusli
    * Re-render other extensions' setStatus lines. We took the footer, so pi no
    * longer draws them; dropping them would make us a bad neighbour. Split on
    * [\r\n] to recover the multi-row capability setStatus denies, and dim only
-   * lines that brought no colour of their own.
+   * lines that brought no colour of their own. Lines a widget already draws
+   * are skipped, or the footer would say the same thing twice.
    */
   const foreignStatusRows = (width: number, theme: ThemeLike): string[] => {
     const out: string[] = [];
     let entries: Array<[string, string]>;
+    let absorbed: ReadonlySet<string>;
     try {
       entries = Array.from(statuses().entries()).sort(([a], [b]) => a.localeCompare(b));
     } catch {
       return out;
     }
+    try {
+      absorbed = deps.absorbedStatusKeys?.() ?? new Set();
+    } catch {
+      // Showing a line twice beats losing every other extension's line.
+      absorbed = new Set();
+    }
     for (const [key, text] of entries) {
-      if (key === WIDGET_KEY || !text) continue;
+      if (key === WIDGET_KEY || absorbed.has(key) || !text) continue;
       for (const line of String(text).split(/[\r\n]+/)) {
         if (!line.trim()) continue;
         const cut = width > 0 ? truncateEnd(line, width) : line;
@@ -186,6 +206,14 @@ export function installStatusline(ctx: PiUIContext, deps: InstallDeps): Statusli
       snapshot = s;
       armTick();
       tuiRef?.requestRender();
+    },
+    extensionStatus(key: string) {
+      try {
+        const text = statuses().get(key);
+        return typeof text === "string" && text !== "" ? text : undefined;
+      } catch {
+        return undefined;
+      }
     },
     dispose() {
       disposed = true;

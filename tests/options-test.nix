@@ -55,6 +55,7 @@ let
         "voice"
         "compaction"
         "pr"
+        "lsp"
         "cost"
       ];
       row3 = [

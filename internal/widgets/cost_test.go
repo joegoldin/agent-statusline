@@ -77,12 +77,13 @@ func TestCostHidesAtZero(t *testing.T) {
 	}
 }
 
-func TestCostAlwaysVisibleInPiMode(t *testing.T) {
+func TestCostVisibleInPiModeOnAnAPIKey(t *testing.T) {
 	ctx := &Context{
 		Mode: input.ModePi,
 		Status: input.Status{
 			Cost: &input.Cost{TotalCostUSD: 1.23},
-			// No RateLimits: exactly the non-Anthropic case.
+			// No RateLimits and no Subscription: exactly the API-key and
+			// OpenRouter case, where every token is billed.
 		},
 	}
 	text, visible := (Cost{}).Render(ctx)
@@ -116,5 +117,50 @@ func TestCostHiddenWhenZeroInPiMode(t *testing.T) {
 	}
 	if _, visible := (Cost{}).Render(ctx); visible {
 		t.Error("cost widget visible with zero cost; want hidden")
+	}
+}
+
+func TestCostHiddenOnAPiSubscription(t *testing.T) {
+	ctx := &Context{
+		Mode: input.ModePi,
+		Status: input.Status{
+			Cost:         &input.Cost{TotalCostUSD: 1.84},
+			Subscription: true,
+			RateLimits: &input.RateLimits{
+				FiveHour: &input.Window{UsedPercentage: 44},
+			},
+		},
+	}
+	if _, visible := (Cost{}).Render(ctx); visible {
+		t.Error("cost widget visible on a pi subscription inside its limits; want hidden")
+	}
+}
+
+func TestCostHiddenOnAPiSubscriptionWithNoLimitsYet(t *testing.T) {
+	// The same rule as Claude mode's resumed session: no limits is not
+	// overage, so the plan's priced-but-unpaid figure stays off the line.
+	ctx := &Context{
+		Mode:   input.ModePi,
+		Status: input.Status{Cost: &input.Cost{TotalCostUSD: 1.84}, Subscription: true},
+	}
+	if _, visible := (Cost{}).Render(ctx); visible {
+		t.Error("cost widget visible on a pi subscription with no limits; want hidden")
+	}
+}
+
+func TestCostShowsOnAPiSubscriptionInOverage(t *testing.T) {
+	ctx := &Context{
+		Mode: input.ModePi,
+		Status: input.Status{
+			Cost:         &input.Cost{TotalCostUSD: 1.84},
+			Subscription: true,
+			RateLimits: &input.RateLimits{
+				SevenDay: &input.Window{UsedPercentage: 100},
+			},
+		},
+	}
+	text, visible := (Cost{}).Render(ctx)
+	if !visible || !strings.Contains(text, "$1.84") {
+		t.Errorf("cost on a pi subscription in overage = %q (visible %v), want $1.84", text, visible)
 	}
 }

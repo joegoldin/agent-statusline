@@ -29,6 +29,12 @@ type PiStatus struct {
 	// republished on its event bus channel. Empty when that extension is not
 	// installed, or is still drawing its own status slot.
 	AutoMode string `json:"auto_mode"`
+	// Subscription is true when the pi-usage extension reports a consumer
+	// subscription (a ChatGPT or similar plan) for the session's provider.
+	// False is "not known to be one", not "known to be billed per token".
+	Subscription bool `json:"subscription"`
+	// LSP is pi-lens's "pi-lens-lsp" status text, verbatim.
+	LSP string `json:"lsp"`
 }
 
 // PiContext is pi's raw token accounting. Percentages are deliberately absent:
@@ -65,9 +71,11 @@ func DecodePi(r io.Reader) (Status, error) {
 			CurrentDir: p.CWD,
 			ProjectDir: projectDir,
 		},
-		RateLimits: p.RateLimits,
-		PR:         p.PR,
-		AutoMode:   p.AutoMode,
+		RateLimits:   p.RateLimits,
+		PR:           p.PR,
+		AutoMode:     p.AutoMode,
+		Subscription: p.Subscription,
+		LSP:          p.LSP,
 	}
 
 	if p.ThinkingLevel != "" {

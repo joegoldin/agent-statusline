@@ -21,7 +21,7 @@ let
   # Every widget the binary can place on a row. Derived from the registry
   # built in cmd/agent-statusline/main.go (`buildRegistry`) — i.e. each
   # widget's `Name()` — and cross-checked against `dropPriority` in the same
-  # file, which lists exactly the same seventeen names.
+  # file, which lists exactly the same eighteen names.
   #
   # The activity-stack widgets (tools, agents, todos) are
   # deliberately absent: they are a fixed, non-configurable stack sized by
@@ -45,6 +45,7 @@ let
     "sessionName"
     "autoMode"
     "cache"
+    "lsp"
   ];
 in
 {
@@ -138,9 +139,14 @@ in
             "voice"
             "compaction"
             "pr"
+            "lsp"
             "cost"
           ];
-          description = "Bottom row — this conversation's state.";
+          description = ''
+            Bottom row — this conversation's state. `lsp` needs pi-lens to be
+            publishing its `pi-lens-lsp` status, and hides while no server is
+            running.
+          '';
         };
         row3 = mkOption {
           type = types.listOf (types.enum widgetNames);

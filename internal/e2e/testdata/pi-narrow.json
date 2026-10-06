@@ -15,5 +15,6 @@
   },
   "cost_usd": 0.42,
   "duration_ms": 330000,
-  "auto_mode": "AM● a:105 d:4 ca:89 cd:4"
+  "auto_mode": "AM● a:105 d:4 ca:89 cd:4",
+  "lsp": "\u001b[32mLSP Active: gopls, nil\u001b[39m · \u001b[31mLSP Failed: pyright\u001b[39m"
 }

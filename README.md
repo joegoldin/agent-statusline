@@ -30,6 +30,42 @@ and it is how you tell a Go bug from a TypeScript one: run the binary by hand
 with a captured payload and see whether the numbers are right before blaming
 the renderer. `internal/e2e/testdata/pi-*.golden` keep it under test.
 
+## What the pi extension reads from other extensions
+
+A few pi payload fields come from other pi extensions rather than from pi
+itself. Each widget that draws one hides when its source is absent or in a
+format it does not recognise.
+
+- `auto_mode`: pi-automode's status text, off the `pi-automode:status` event
+  channel, drawn by the `autoMode` widget.
+- `rate_limits` and `subscription`: from pi-usage's `pi-usage:report`
+  channel, which carries `{ report?: UsageReport }` each time pi-usage
+  publishes its `usage` status (`report` is undefined when it clears it).
+  `subscription` is `true` when `report.semantics.kind` is
+  `"consumer-subscription"` and absent otherwise. Percent buckets with a
+  `used` figure fill the `usage5h` slot (a window of up to 6 h) and the
+  `usage7d` slot (6 to 8 days), the fullest winning when several fit one slot.
+  The ChatGPT app's allowance (`groupId: "chatgpt-app"`) is skipped because it
+  does not meter pi. `resetsAt` is already Unix seconds, like `resets_at`.
+  Anthropic's unified rate-limit response headers take precedence while the
+  provider that sent them is still the current model's provider; otherwise
+  pi-usage's windows are used.
+- `lsp`: pi-lens's `pi-lens-lsp` status text, read out of pi's footer status
+  map, drawn by the `lsp` widget: running servers in the OK colour, failed
+  ones in the danger colour, or just their counts on a narrow terminal.
+  "LSP Inactive" hides it, as does pi-lens's compact "LSP ✗" on its own, which
+  can mean either a failure or no server at all.
+
+Under pi the `cost` widget is hidden when `subscription` is true, unless a
+rate-limit window is at 100%: a plan login is priced from the same model
+catalogue as an API key, but nobody pays that figure. API-key and OpenRouter
+sessions still show it.
+
+Other extensions' status lines are redrawn under the statusline, since it
+takes pi's footer. `pi-lens-lsp` is not, because the `lsp` widget draws it,
+and neither is pi-usage's `usage` line while its plan windows are what the
+usage widgets show. An API-key balance has no widget, so that line stays.
+
 ## Consumers
 
 - `claude-nix` sets `settings.statusLine.command` to this binary

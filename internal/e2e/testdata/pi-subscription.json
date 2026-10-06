@@ -1,7 +1,7 @@
 {
   "harness": "pi",
   "cwd": "/tmp/agent-statusline-test-home/project",
-  "session_id": "pi-golden-1",
+  "session_id": "pi-golden-2",
   "session_name": "golden",
   "session_path": "",
   "model": {"id": "gpt-5.6-sol", "display_name": "Sol", "provider": "openai-codex"},
@@ -13,8 +13,12 @@
     "cache_read_tokens": 90000,
     "cache_creation_tokens": 4000
   },
-  "cost_usd": 0.42,
+  "cost_usd": 1.84,
   "duration_ms": 330000,
-  "auto_mode": "AM● a:105 d:4 ca:89 cd:4",
-  "lsp": "\u001b[32mLSP Active: gopls, nil\u001b[39m · \u001b[31mLSP Failed: pyright\u001b[39m"
+  "rate_limits": {
+    "five_hour": {"used_percentage": 44, "resets_at": 1748271600},
+    "seven_day": {"used_percentage": 56, "resets_at": 1748538000}
+  },
+  "subscription": true,
+  "lsp": "\u001b[2mLSP Inactive\u001b[22m"
 }

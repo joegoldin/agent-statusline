@@ -34,6 +34,10 @@ func TestGolden(t *testing.T) {
 		{"narrow", "40", "", ""},
 		{"pi-full", "120", "", ""},
 		{"pi-narrow", "40", "", ""},
+		// A ChatGPT plan login, as pi-usage reports it: the plan windows feed
+		// the usage widgets, the catalogue-priced cost stays off the line, and
+		// pi-lens's idle "LSP Inactive" takes no slot.
+		{"pi-subscription", "120", "", ""},
 		{"pi-full", "120", "", "json"},
 	}
 	for _, tc := range tests {

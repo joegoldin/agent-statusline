@@ -27,6 +27,7 @@
       "voice",
       "compaction",
       "pr",
+      "lsp",
       "cost"
     ],
     "row3": [
@@ -39,6 +40,7 @@
       "autoMode",
       "cache",
       "sessionName",
+      "lsp",
       "compaction",
       "pr",
       "voice",
@@ -214,6 +216,53 @@
     },
     "git": {
       "visible": false
+    },
+    "lsp": {
+      "visible": true,
+      "spans": [
+        {
+          "kind": "text",
+          "text": " ",
+          "intent": "danger"
+        },
+        {
+          "kind": "text",
+          "text": "✓ gopls, nil",
+          "intent": "ok"
+        },
+        {
+          "kind": "text",
+          "text": " ",
+          "intent": "text"
+        },
+        {
+          "kind": "text",
+          "text": "✗ pyright",
+          "intent": "danger"
+        }
+      ],
+      "compact": [
+        {
+          "kind": "text",
+          "text": " ",
+          "intent": "danger"
+        },
+        {
+          "kind": "text",
+          "text": "✓2",
+          "intent": "ok"
+        },
+        {
+          "kind": "text",
+          "text": " ",
+          "intent": "text"
+        },
+        {
+          "kind": "text",
+          "text": "✗1",
+          "intent": "danger"
+        }
+      ]
     },
     "model": {
       "visible": true,

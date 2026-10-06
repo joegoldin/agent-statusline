@@ -26,6 +26,13 @@ type Status struct {
 	// carried unparsed because the parse belongs next to the widget that has
 	// to hide when it fails; Claude Code never sets it.
 	AutoMode string `json:"auto_mode"`
+	// Subscription marks a session whose usage is paid for by a plan rather
+	// than per token, so a running cost figure means nothing. Only the pi
+	// decoder sets it; Claude mode infers the same from RateLimits instead.
+	Subscription bool `json:"subscription"`
+	// LSP is pi-lens's language-server status text, verbatim, parsed next to
+	// the widget for the same reason as AutoMode. Claude Code never sets it.
+	LSP string `json:"lsp"`
 }
 
 type Model struct {

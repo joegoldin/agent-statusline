@@ -106,6 +106,13 @@ export interface PiPayload {
    * widget can hide on a format change instead of rendering a wrong tally.
    */
   auto_mode?: string;
+  /**
+   * True when pi-usage reports a consumer subscription for the session, so
+   * the Go side can hide a catalogue-priced cost nobody is paying.
+   */
+  subscription?: boolean;
+  /** pi-lens's "pi-lens-lsp" status text, verbatim. Parsed in Go, like auto_mode. */
+  lsp?: string;
   context?: PiPayloadContext;
   cost_usd?: number;
   duration_ms: number;
@@ -125,10 +132,17 @@ export interface SessionState {
   apiDurationMs: number;
   /** Usage of the most recent assistant message — pi's only token breakdown. */
   lastUsage?: PiUsage;
+  /** Limits off Anthropic's response headers. */
   rateLimits?: RateLimits;
+  /** The model provider that was answering when `rateLimits` arrived. */
+  rateLimitsProvider?: string;
+  /** What pi-usage last reported, or undefined once it clears its status. */
+  planUsage?: PlanUsage;
   version?: string;
   /** Last status text auto mode published, or undefined once it stops. */
   autoMode?: string;
+  /** pi-lens's LSP status text as of the last refresh. */
+  lsp?: string;
 }
 
 export function newSessionState(now = Date.now()): SessionState {
@@ -164,9 +178,13 @@ export function buildPayload(
     duration_ms: Math.max(0, now - state.startedAt),
     api_duration_ms: state.apiDurationMs > 0 ? state.apiDurationMs : undefined,
     cost_usd: state.costUsd > 0 ? state.costUsd : undefined,
-    rate_limits: state.rateLimits,
+    rate_limits: activeRateLimits(state, ctx?.model?.provider).rateLimits,
     version: state.version,
     auto_mode: state.autoMode,
+    // Only ever true or absent: absent is "not known to be a plan", which is
+    // what keeps cost visible on an API key.
+    subscription: state.planUsage?.subscription || undefined,
+    lsp: state.lsp || undefined,
   };
 
   // pi-ai Model exposes `name`, not `displayName`. The provider rides along
@@ -225,7 +243,7 @@ const HEADER_WINDOWS: ReadonlyArray<[keyof RateLimits, string]> = [
 /**
  * rateLimitsFromHeaders reads Anthropic's unified rate-limit headers off an
  * `after_provider_response` event. Absent on Codex, OpenRouter and API-key
- * auth, in which case the widgets stay hidden.
+ * auth, which leave the widgets to pi-usage's report or hidden.
  */
 export function rateLimitsFromHeaders(headers: Record<string, string> | undefined): RateLimits | undefined {
   if (!headers) return undefined;
@@ -268,6 +286,150 @@ export function autoModeText(data: unknown): string | undefined {
   if (!data || typeof data !== "object") return undefined;
   const text = (data as { text?: unknown }).text;
   return typeof text === "string" && text !== "" ? text : undefined;
+}
+
+/**
+ * The channel pi-usage publishes its report on, alongside each update to its
+ * "usage" status slot. `{ report: undefined }` means it cleared that slot or
+ * has nothing ready, and clears ours.
+ */
+export const PI_USAGE_REPORT_CHANNEL = "pi-usage:report";
+
+/** One window or balance from pi-usage's `UsageReport` (src/types.ts). */
+export interface PiUsageBucket {
+  id: string;
+  label: string;
+  groupId?: string;
+  groupLabel?: string;
+  modelKeys?: string[];
+  used?: number;
+  remaining?: number;
+  limit?: number;
+  unit: "percent" | "usd" | "currency" | "count";
+  period?: string;
+  windowMinutes?: number;
+  /** Unix seconds, the same unit as the wire's `resets_at`. */
+  resetsAt?: number;
+}
+
+/** pi-usage's `UsageReport`, mirrored from its src/types.ts. */
+export interface PiUsageReport {
+  providerId: string;
+  providerName: string;
+  capturedAt: number;
+  source: string;
+  semantics: { kind: "consumer-subscription" | "api-key" | "project"; label: string };
+  accountLabel?: string;
+  buckets: PiUsageBucket[];
+  metrics: unknown[];
+  notes?: string[];
+}
+
+/** What this extension keeps of a pi-usage report. */
+export interface PlanUsage {
+  subscription: boolean;
+  rateLimits?: RateLimits;
+}
+
+/**
+ * The ChatGPT app's own allowance. pi-usage reports it beside the plan
+ * windows, but it meters the ChatGPT app, not pi, so it must not fill a slot.
+ */
+const CHATGPT_APP_GROUP = "chatgpt-app";
+
+const FIVE_HOUR_MAX_MINUTES = 6 * 60;
+const SEVEN_DAY_MIN_MINUTES = 6 * 24 * 60;
+const SEVEN_DAY_MAX_MINUTES = 8 * 24 * 60;
+
+/**
+ * rateLimitsFromUsageBuckets maps pi-usage's percent windows onto the two
+ * slots the usage widgets draw, by window length rather than by id: a window
+ * of up to 6 h is the 5-hour slot, one of 6 to 8 days the 7-day slot. Every
+ * provider names its windows differently, and the length is the one thing
+ * they all report. A window of any other length, or with no length, has no
+ * slot. When several windows land in one slot the fullest wins, because that
+ * is the one that will stop the session first.
+ */
+export function rateLimitsFromUsageBuckets(buckets: readonly PiUsageBucket[] | undefined): RateLimits | undefined {
+  if (!Array.isArray(buckets)) return undefined;
+  let out: RateLimits | undefined;
+  for (const bucket of buckets) {
+    if (!bucket || typeof bucket !== "object") continue;
+    if (bucket.unit !== "percent" || bucket.groupId === CHATGPT_APP_GROUP) continue;
+    const used = bucket.used;
+    const minutes = bucket.windowMinutes;
+    if (typeof used !== "number" || !Number.isFinite(used)) continue;
+    if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes <= 0) continue;
+
+    let field: keyof RateLimits;
+    if (minutes <= FIVE_HOUR_MAX_MINUTES) field = "five_hour";
+    else if (minutes >= SEVEN_DAY_MIN_MINUTES && minutes <= SEVEN_DAY_MAX_MINUTES) field = "seven_day";
+    else continue;
+
+    if (out?.[field] && out[field]!.used_percentage >= used) continue;
+    const reset = bucket.resetsAt;
+    out ??= {};
+    out[field] = {
+      used_percentage: used,
+      resets_at: typeof reset === "number" && Number.isFinite(reset) ? reset : 0,
+    };
+  }
+  return out;
+}
+
+/**
+ * Validate one `{ report }` envelope off pi-usage's channel. Anything that is
+ * not recognisably a report clears the plan usage rather than keeping the last
+ * one: a stale plan figure under a different provider is worse than none.
+ */
+export function planUsageFromReport(data: unknown): PlanUsage | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const report = (data as { report?: unknown }).report as PiUsageReport | undefined;
+  if (!report || typeof report !== "object" || !report.semantics || typeof report.semantics !== "object") {
+    return undefined;
+  }
+  return {
+    subscription: report.semantics.kind === "consumer-subscription",
+    rateLimits: rateLimitsFromUsageBuckets(report.buckets),
+  };
+}
+
+/**
+ * activeRateLimits picks which source feeds the usage widgets. Anthropic's
+ * headers win while the model that produced them is still the current one:
+ * they arrive on every response, so they are never older than pi-usage's
+ * poll. Under any other provider they describe an account the session is no
+ * longer using, and pi-usage, which follows the current model, decides.
+ */
+export function activeRateLimits(
+  state: SessionState,
+  provider: string | undefined,
+): { rateLimits?: RateLimits; fromPlanUsage: boolean } {
+  if (state.rateLimits && state.rateLimitsProvider === provider) {
+    return { rateLimits: state.rateLimits, fromPlanUsage: false };
+  }
+  const plan = state.planUsage?.rateLimits;
+  return plan ? { rateLimits: plan, fromPlanUsage: true } : { rateLimits: undefined, fromPlanUsage: false };
+}
+
+/** pi-lens's status key for its language-server line. */
+export const LSP_STATUS_SLOT = "pi-lens-lsp";
+/** pi-usage's status key. */
+export const USAGE_STATUS_SLOT = "usage";
+
+/**
+ * absorbedStatusKeys names the other extensions' status lines this statusline
+ * already draws as widgets, so the footer does not show them twice. pi-lens's
+ * line always is, as the lsp widget. pi-usage's is only while its plan windows
+ * are what the usage widgets are showing; an API-key balance has no widget,
+ * so that line still earns its place under the footer.
+ */
+export function absorbedStatusKeys(state: SessionState, provider: string | undefined): Set<string> {
+  const keys = new Set([LSP_STATUS_SLOT]);
+  if (state.planUsage?.subscription && activeRateLimits(state, provider).fromPlanUsage) {
+    keys.add(USAGE_STATUS_SLOT);
+  }
+  return keys;
 }
 
 /** The bits of a session entry this extension cares about. */
@@ -394,7 +556,9 @@ export default function (pi: any) {
   state.version = readPiVersion();
   const binary = process.env.AGENT_STATUSLINE_BIN ?? "agent-statusline";
   let providerStartedAt = 0;
-  let handle: { setSnapshot(s: any): void; dispose(): void } | undefined;
+  let handle:
+    | { setSnapshot(s: any): void; extensionStatus(key: string): string | undefined; dispose(): void }
+    | undefined;
   let poll: ReturnType<typeof setInterval> | undefined;
   let inFlight = false;
   let pendingRefresh = false;
@@ -413,6 +577,15 @@ export default function (pi: any) {
     });
   } catch {
     // A bus that refuses subscribers costs one widget, never the statusline.
+  }
+  let unsubscribeUsage: (() => void) | undefined;
+  try {
+    unsubscribeUsage = pi.events?.on?.(PI_USAGE_REPORT_CHANNEL, (data: unknown) => {
+      state.planUsage = planUsageFromReport(data);
+      if (lastCtx) void refresh(lastCtx);
+    });
+  } catch {
+    // Without pi-usage the usage widgets fall back to Anthropic's headers.
   }
 
   const syncSession = (ctx: PiExtensionContext) => {
@@ -475,10 +648,15 @@ export default function (pi: any) {
   });
 
   // Anthropic surfaces rate limits in response headers. Absent on Codex,
-  // OpenRouter, and API-key auth, in which case the widgets stay hidden.
-  pi.on("after_provider_response", (event: any) => {
+  // OpenRouter, and API-key auth, where only pi-usage's report can fill the
+  // widgets. The provider is remembered with them so a later switch to another
+  // provider stops them standing in for that provider's limits.
+  pi.on("after_provider_response", (event: any, ctx: PiExtensionContext) => {
     const limits = rateLimitsFromHeaders(event?.headers);
-    if (limits) state.rateLimits = limits;
+    if (limits) {
+      state.rateLimits = limits;
+      state.rateLimitsProvider = ctx?.model?.provider;
+    }
   });
 
   // Tool timing goes through the same sidecar Claude Code's hooks write. No
@@ -508,7 +686,10 @@ export default function (pi: any) {
     handle?.dispose();
     // onDataStale fires on a branch change, which pi already watches and
     // debounces for us — cheaper and more responsive than polling git.
-    handle = installStatusline(ctx as any, { onDataStale: () => void refresh(ctx) });
+    handle = installStatusline(ctx as any, {
+      onDataStale: () => void refresh(ctx),
+      absorbedStatusKeys: () => absorbedStatusKeys(state, lastCtx?.model?.provider),
+    });
     if (poll) clearInterval(poll);
     poll = setInterval(() => void refresh(ctx), DATA_POLL_MS);
     (poll as { unref?: () => void }).unref?.();
@@ -517,6 +698,8 @@ export default function (pi: any) {
   function teardown() {
     unsubscribeAutoMode?.();
     unsubscribeAutoMode = undefined;
+    unsubscribeUsage?.();
+    unsubscribeUsage = undefined;
     if (poll) clearInterval(poll);
     poll = undefined;
     handle?.dispose();
@@ -537,6 +720,10 @@ export default function (pi: any) {
     inFlight = true;
     try {
       if (!state.sessionId) syncSession(ctx);
+      // pi-lens publishes no event, only its status slot, and that is only
+      // readable through the footer this extension took. A change shows up on
+      // the next refresh, which the data poll bounds.
+      state.lsp = handle?.extensionStatus(LSP_STATUS_SLOT);
       const payload = buildPayload(ctx, state);
       // No cwd override: the Go side reads the workspace out of the payload's
       // `cwd` field, and spawning into a directory that has since been removed

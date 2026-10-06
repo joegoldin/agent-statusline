@@ -118,6 +118,53 @@ describe("installStatusline", () => {
     expect(rows).not.toContain("stale");
   });
 
+  it("skips the status lines a widget already draws, and only those", () => {
+    const f = fakeUI(
+      new Map([
+        ["pi-lens-lsp", "LSP Active: gopls"],
+        ["usage", "chatgpt plan 56% \u21bb 3d5h"],
+        ["zz-other", "other line"],
+      ]),
+    );
+    let absorbed = new Set(["pi-lens-lsp", "usage"]);
+    const h = installStatusline(f.ctx as any, { absorbedStatusKeys: () => absorbed });
+    h.setSnapshot(snap);
+    const render = () => f.widgets.get(WIDGET_KEY)!.component.render(200).join("\n");
+    expect(render()).not.toContain("LSP Active");
+    expect(render()).not.toContain("chatgpt plan");
+    expect(render()).toContain("other line");
+
+    // Asked per frame: once the usage widgets stop showing pi-usage's plan,
+    // its line comes back without a reinstall.
+    absorbed = new Set(["pi-lens-lsp"]);
+    expect(render()).toContain("chatgpt plan");
+  });
+
+  it("keeps every foreign line when the absorbed-key callback throws", () => {
+    const f = fakeUI(new Map([["usage", "openrouter $4.20 left"]]));
+    const h = installStatusline(f.ctx as any, {
+      absorbedStatusKeys: () => {
+        throw new Error("boom");
+      },
+    });
+    h.setSnapshot(snap);
+    expect(f.widgets.get(WIDGET_KEY)!.component.render(200).join("\n")).toContain("openrouter $4.20 left");
+  });
+
+  it("reads another extension's status text through the footer it took", () => {
+    const f = fakeUI(new Map([["pi-lens-lsp", "LSP Active: gopls"], ["empty", ""]]));
+    const h = installStatusline(f.ctx as any, {});
+    expect(h.extensionStatus("pi-lens-lsp")).toBe("LSP Active: gopls");
+    expect(h.extensionStatus("empty")).toBeUndefined();
+    expect(h.extensionStatus("absent")).toBeUndefined();
+  });
+
+  it("reads no status text outside TUI mode", () => {
+    const f = fakeUI(new Map([["pi-lens-lsp", "LSP Active: gopls"]]));
+    const h = installStatusline({ ...f.ctx, mode: "print", hasUI: false } as any, {});
+    expect(h.extensionStatus("pi-lens-lsp")).toBeUndefined();
+  });
+
   it("ticks requestRender at the snapshot's refresh interval", () => {
     jest.useFakeTimers();
     const f = fakeUI();

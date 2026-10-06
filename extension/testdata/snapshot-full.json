@@ -27,19 +27,20 @@
       "voice",
       "compaction",
       "pr",
+      "lsp",
       "cost"
     ],
     "row3": [
-      "autoMode"
-    ],
-    "row4": [
+      "autoMode",
       "cache"
     ],
+    "row4": [],
     "hide": [],
     "dropPriority": [
       "autoMode",
       "cache",
       "sessionName",
+      "lsp",
       "compaction",
       "pr",
       "voice",
@@ -132,56 +133,8 @@
       "spans": [
         {
           "kind": "text",
-          "text": " cache 79.3%",
+          "text": " cache 79.3%",
           "intent": "ok"
-        },
-        {
-          "kind": "text",
-          "text": " │ ",
-          "intent": "text"
-        },
-        {
-          "kind": "bar",
-          "fill": 0.7934272300469484,
-          "cells": 10,
-          "style": "braille"
-        },
-        {
-          "kind": "text",
-          "text": " │ ",
-          "intent": "text"
-        },
-        {
-          "kind": "text",
-          "text": "1.69M/2.13M",
-          "intent": "dim"
-        },
-        {
-          "kind": "text",
-          "text": " │ ",
-          "intent": "text"
-        },
-        {
-          "kind": "text",
-          "text": "35/41",
-          "intent": "meta"
-        }
-      ],
-      "compact": [
-        {
-          "kind": "text",
-          "text": " cache 79.3%",
-          "intent": "ok"
-        },
-        {
-          "kind": "text",
-          "text": " │ ",
-          "intent": "text"
-        },
-        {
-          "kind": "text",
-          "text": "35/41",
-          "intent": "meta"
         }
       ]
     },
@@ -264,6 +217,53 @@
     "git": {
       "visible": false
     },
+    "lsp": {
+      "visible": true,
+      "spans": [
+        {
+          "kind": "text",
+          "text": " ",
+          "intent": "danger"
+        },
+        {
+          "kind": "text",
+          "text": "✓ gopls, nil",
+          "intent": "ok"
+        },
+        {
+          "kind": "text",
+          "text": " ",
+          "intent": "text"
+        },
+        {
+          "kind": "text",
+          "text": "✗ pyright",
+          "intent": "danger"
+        }
+      ],
+      "compact": [
+        {
+          "kind": "text",
+          "text": " ",
+          "intent": "danger"
+        },
+        {
+          "kind": "text",
+          "text": "✓2",
+          "intent": "ok"
+        },
+        {
+          "kind": "text",
+          "text": " ",
+          "intent": "text"
+        },
+        {
+          "kind": "text",
+          "text": "✗1",
+          "intent": "danger"
+        }
+      ]
+    },
     "model": {
       "visible": true,
       "spans": [
@@ -345,12 +345,6 @@
         "emittedAtMs": 1748260780000,
         "startedAtMs": 1748260780000,
         "endedAtMs": 1748260792000
-      }
-    ],
-    "toolCounts": [
-      {
-        "name": "read",
-        "count": 2
       }
     ],
     "agents": null,

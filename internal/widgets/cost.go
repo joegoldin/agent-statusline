@@ -25,9 +25,11 @@ func (Cost) RenderSpans(ctx *Context) (render.Spans, bool) {
 	}
 	// Claude Max subscribers don't pay for usage inside their plan limits, so
 	// in Claude mode cost only surfaces in overage territory. Under pi the auth
-	// is Codex / API key / OpenRouter, where every token is billed and cost is
-	// the primary meter — so it always shows.
-	if ctx.Mode != input.ModePi && !inOverage(ctx.Status.RateLimits) {
+	// may be an API key or OpenRouter, where every token is billed and cost is
+	// the primary meter, so it shows unless pi-usage has said the session is
+	// on a subscription — a ChatGPT plan login is priced from the same
+	// catalogue, and that figure is money nobody is spending.
+	if (ctx.Mode != input.ModePi || ctx.Status.Subscription) && !inOverage(ctx.Status.RateLimits) {
 		return nil, false
 	}
 	return render.Spans{render.Text(render.IntentDanger, fmt.Sprintf("%s$%.2f", costGlyph, c.TotalCostUSD))}, true

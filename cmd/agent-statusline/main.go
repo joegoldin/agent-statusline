@@ -30,7 +30,7 @@ import (
 // narrow terminal keeps the "who/where/budget" header intact.
 var dropPriority = []string{
 	"autoMode", "cache",
-	"sessionName", "compaction", "pr", "voice", "cost",
+	"sessionName", "lsp", "compaction", "pr", "voice", "cost",
 	"burnRate", "duration", "tokens", "effort", "context",
 	"usage7d", "usage5h", "git", "cwd", "model",
 }
@@ -273,6 +273,7 @@ func buildRegistry() widgets.Registry {
 		widgets.Usage5h{}, widgets.Usage7d{}, widgets.BurnRate{},
 		widgets.Effort{}, widgets.Voice{}, widgets.Compaction{}, widgets.PR{},
 		widgets.SessionName{}, widgets.AutoMode{}, widgets.Cache{},
+		widgets.LSP{},
 	}
 	r := widgets.Registry{}
 	for _, w := range all {

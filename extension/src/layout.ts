@@ -158,11 +158,17 @@ export function wrapRow(names: string[], snap: Snapshot, width: number, theme: T
 /**
  * Every line the statusline draws, already fitted to `width`.
  *
- * The dashboard outranks the activity stack: if both rows fit on one line they
- * merge, otherwise the dashboard *wraps* onto extra lines rather than being
- * truncated, and the activity rows get squeezed out of the remaining budget.
- * That is main.go's rule, kept identical so the two renderers make the same
- * calls at the same widths.
+ * Every dashboard widget, rows 1 to 4 in order, is packed into as few lines as
+ * fit: a line breaks only when the next widget would not fit on it, so a widget
+ * left over from row 1 shares its line with row 2's rather than taking a line
+ * of its own. Nothing is truncated. A single activity line joins the last
+ * dashboard line when it fits there too; otherwise activity fills what is left
+ * of the line budget, as before.
+ *
+ * This packs tighter than main.go, which keeps rows 1 and 2 as separate wrapped
+ * blocks unless both fit on one line. pi's footer sits under the prompt and
+ * every line it takes is one the transcript loses; Claude Code's statusline
+ * keeps main.go's layout, which its goldens pin.
  */
 export function renderRows(
   snap: Snapshot,
@@ -174,34 +180,26 @@ export function renderRows(
   const sep = cfg.separator;
   const maxLines = cfg.maxLines > 0 ? cfg.maxLines : 6;
 
-  const row1 = composeRow(cfg.row1 ?? [], snap, 0, theme);
-  const row2 = composeRow(cfg.row2 ?? [], snap, 0, theme);
-  const w1 = visibleWidth(row1);
-  const w2 = visibleWidth(row2);
-
-  let dashboard: string[];
-  if (w1 > 0 && w2 > 0 && w1 + visibleWidth(sep) + w2 <= width) {
-    dashboard = [row1 + sep + row2];
-  } else {
-    dashboard = [
-      ...wrapRow(cfg.row1 ?? [], snap, width, theme),
-      ...wrapRow(cfg.row2 ?? [], snap, width, theme),
-    ];
-  }
-  // Rows 3 and 4 are extra lines rather than dashboard columns: each carries a
-  // single widget that draws several figures of its own. They wrap like the
-  // dashboard and cost nothing when their widget hides.
-  for (const names of [cfg.row3 ?? [], cfg.row4 ?? []]) {
-    dashboard.push(...wrapRow(names, snap, width, theme));
-  }
-  dashboard = dashboard.filter((l) => l.trim().length > 0).slice(0, maxLines);
+  const names = [...(cfg.row1 ?? []), ...(cfg.row2 ?? []), ...(cfg.row3 ?? []), ...(cfg.row4 ?? [])];
+  const dashboard = wrapRow(names, snap, width, theme)
+    .filter((l) => l.trim().length > 0)
+    .slice(0, maxLines);
 
   const budget = Math.min(maxLines - dashboard.length, cfg.activityRows ?? 0);
-  const activity = budget > 0 ? activityRows(snap, width, theme, now, budget) : [];
+  // Asked for one extra row, in case the first activity line moves up.
+  const activity = budget > 0 ? activityRows(snap, width, theme, now, budget + 1) : [];
+  const last = dashboard.length - 1;
+  if (activity.length > 0 && last >= 0) {
+    const joined = dashboard[last] + sep + activity[0];
+    if (width <= 0 || visibleWidth(joined) <= width) {
+      dashboard[last] = joined;
+      activity.shift();
+    }
+  }
 
   const padding = cfg.padding > 0 ? cfg.padding : 0;
   const pad = padding > 0 ? " ".repeat(padding) : "";
-  return [...dashboard, ...activity]
+  return [...dashboard, ...activity.slice(0, Math.max(0, budget))]
     .map((l) => (pad ? pad + truncateEnd(l, width - padding) : l))
     .filter((l) => l.trim().length > 0);
 }

@@ -168,11 +168,9 @@ describe("pi widget render contract", () => {
   it("preserves flex padding, which the setStatus path destroyed", () => {
     const { theme } = recordingTheme();
     // composeRow with a real width budget is where a flex spacer means
-    // anything. renderRows never gives it one: main.go composes both rows at
-    // Width 0 to decide whether they merge, and its wrap path ignores flex
-    // outright, so a flex spacer collapses to zero cells there. This port
-    // keeps that behaviour rather than quietly improving on it, so the two
-    // renderers still agree line for line.
+    // anything. renderRows never gives it one: it packs every dashboard
+    // widget through wrapRow, which ignores flex outright, so a flex spacer
+    // collapses to zero cells there, as it does in main.go's wrap path.
     const line = composeRow(["model", snap.config.flexName, "cwd"], snap, 120, theme);
     expect(piVisibleWidth(line)).toBe(120);
     expect(/ {4,}/.test(line)).toBe(true);

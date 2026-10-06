@@ -175,13 +175,26 @@ describe("renderRows", () => {
     expect(at7).not.toBe(at0);
   });
 
-  it("draws row3 and row4 as extra lines under the dashboard", () => {
+  it("packs rows 3 and 4 onto the dashboard's lines when they fit", () => {
     const { theme } = recordingTheme();
     const rows = renderRows(withExtraRows(snap), 400, theme, NOW);
-    // Width 400 merges the dashboard onto one line, so the extra rows are the
-    // two immediately after it and the activity stack follows them.
-    expect(rows[1]).toContain("auto \u25cf");
-    expect(rows[2]).toContain("cache 79.3%");
+    // Width 400 holds every widget, so auto mode and the cache share the
+    // dashboard's one line instead of taking lines of their own.
+    expect(rows[0]).toContain("auto \u25cf");
+    expect(rows[0]).toContain("cache 79.3%");
+  });
+
+  it("packs every dashboard widget as one flow, not one block per row", () => {
+    const { theme } = recordingTheme();
+    const quiet: Snapshot = {
+      ...withExtraRows(snap),
+      activity: { ...snap.activity, tools: [], agents: [], todos: null },
+    };
+    const c = quiet.config;
+    const names = [...(c.row1 ?? []), ...(c.row2 ?? []), ...(c.row3 ?? []), ...(c.row4 ?? [])];
+    for (const width of [60, 80, 120]) {
+      expect(renderRows(quiet, width, theme, NOW)).toEqual(wrapRow(names, quiet, width, theme));
+    }
   });
 
   it("costs no line when an extra row's widget is hidden", () => {

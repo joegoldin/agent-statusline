@@ -7,7 +7,8 @@ import (
 	"github.com/joegoldin/agent-statusline/internal/render"
 )
 
-const costGlyph = " " // nf-fa-dollar
+const costGlyph = " "        // nf-fa-dollar
+const subscriptionGlyph = "" // nf-fa-id_card
 
 type Cost struct{}
 
@@ -19,17 +20,17 @@ func (Cost) Render(ctx *Context) (string, bool) {
 }
 
 func (Cost) RenderSpans(ctx *Context) (render.Spans, bool) {
+	// Reaching a plan limit does not turn catalogue pricing into a bill.
+	if ctx.Mode == input.ModePi && ctx.Status.Subscription {
+		return render.Spans{render.Text(render.IntentMeta, subscriptionGlyph)}, true
+	}
 	c := ctx.Status.Cost
 	if c == nil || c.TotalCostUSD <= 0 {
 		return nil, false
 	}
-	// Claude Max subscribers don't pay for usage inside their plan limits, so
-	// in Claude mode cost only surfaces in overage territory. Under pi the auth
-	// may be an API key or OpenRouter, where every token is billed and cost is
-	// the primary meter, so it shows unless pi-usage has said the session is
-	// on a subscription — a ChatGPT plan login is priced from the same
-	// catalogue, and that figure is money nobody is spending.
-	if (ctx.Mode != input.ModePi || ctx.Status.Subscription) && !inOverage(ctx.Status.RateLimits) {
+	// Keep Claude's existing overage display; Pi subscription sessions were
+	// handled above, leaving metered usage on the dollar display.
+	if ctx.Mode != input.ModePi && !inOverage(ctx.Status.RateLimits) {
 		return nil, false
 	}
 	return render.Spans{render.Text(render.IntentDanger, fmt.Sprintf("%s$%.2f", costGlyph, c.TotalCostUSD))}, true

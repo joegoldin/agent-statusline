@@ -38,11 +38,10 @@ format it does not recognise.
 
 - `auto_mode`: pi-automode's status text, off the `pi-automode:status` event
   channel, drawn by the `autoMode` widget.
-- `rate_limits` and `subscription`: from pi-usage's `pi-usage:report`
+- `rate_limits`: from pi-usage's `pi-usage:report`
   channel, which carries `{ report?: UsageReport }` each time pi-usage
   publishes its `usage` status (`report` is undefined when it clears it).
-  `subscription` is `true` when `report.semantics.kind` is
-  `"consumer-subscription"` and absent otherwise. Percent buckets with a
+  Percent buckets with a
   `used` figure fill the `usage5h` slot (a window of up to 6 h) and the
   `usage7d` slot (6 to 8 days), the fullest winning when several fit one slot.
   The ChatGPT app's allowance (`groupId: "chatgpt-app"`) is skipped because it
@@ -50,16 +49,22 @@ format it does not recognise.
   Anthropic's unified rate-limit response headers take precedence while the
   provider that sent them is still the current model's provider; otherwise
   pi-usage's windows are used.
+- `subscription`: from Pi's current OAuth auth method and its
+  `isSubscription` metadata, without reading credentials. This works without
+  pi-usage installed. Older Pi versions fall back to pi-usage's
+  `"consumer-subscription"` report when auth metadata is unavailable.
 - `lsp`: pi-lens's `pi-lens-lsp` status text, read out of pi's footer status
   map, drawn by the `lsp` widget: running servers in the OK colour, failed
   ones in the danger colour, or just their counts on a narrow terminal.
   "LSP Inactive" hides it, as does pi-lens's compact "LSP ✗" on its own, which
   can mean either a failure or no server at all.
 
-Under pi the `cost` widget is hidden when `subscription` is true, unless a
-rate-limit window is at 100%: a plan login is priced from the same model
-catalogue as an API key, but nobody pays that figure. API-key and OpenRouter
-sessions still show it.
+Under pi the `cost` widget shows a membership-card icon (``) when
+`subscription` is true, even before the first response or at a plan limit.
+Catalogue pricing is not a subscription bill, and reaching a limit does not
+prove extra charges. API-key and metered OAuth sessions retain the dollar
+figure. Plan percentages remain account-wide; no per-conversation share is
+inferred from them. Claude's existing usage and cost display is unchanged.
 
 Other extensions' status lines are redrawn under the statusline, since it
 takes pi's footer. `pi-lens-lsp` is not, because the `lsp` widget draws it,

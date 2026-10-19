@@ -59,6 +59,10 @@ export interface PiExtensionContext {
   cwd?: string;
   model?: PiModel;
   thinkingLevel?: string;
+  modelRegistry?: {
+    isUsingOAuth?: (model: PiModel) => boolean;
+    getProvider?: (provider: string) => { auth: { oauth?: { isSubscription?: boolean } } } | undefined;
+  };
   getContextUsage?: () => PiContextUsage | undefined;
   sessionManager?: {
     getCwd?: () => string;
@@ -107,7 +111,7 @@ export interface PiPayload {
    */
   auto_mode?: string;
   /**
-   * True when pi-usage reports a consumer subscription for the session, so
+   * True when auth metadata or pi-usage identifies a subscription, so
    * the Go side can hide a catalogue-priced cost nobody is paying.
    */
   subscription?: boolean;
@@ -183,7 +187,7 @@ export function buildPayload(
     auto_mode: state.autoMode,
     // Only ever true or absent: absent is "not known to be a plan", which is
     // what keeps cost visible on an API key.
-    subscription: state.planUsage?.subscription || undefined,
+    subscription: (subscriptionAuth(ctx) ?? state.planUsage?.subscription) || undefined,
     lsp: state.lsp || undefined,
   };
 
@@ -233,6 +237,20 @@ export function buildPayload(
   }
 
   return payload;
+}
+
+/** Read auth metadata, not credentials; a usage polling extension is optional. */
+function subscriptionAuth(ctx: PiExtensionContext): boolean | undefined {
+  const model = ctx?.model;
+  const registry = ctx?.modelRegistry;
+  if (!model?.provider || !registry?.isUsingOAuth) return undefined;
+  try {
+    if (!registry.isUsingOAuth(model)) return false;
+    const provider = registry.getProvider?.(model.provider);
+    return provider ? provider.auth.oauth?.isSubscription === true : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 const HEADER_WINDOWS: ReadonlyArray<[keyof RateLimits, string]> = [

@@ -120,47 +120,26 @@ func TestCostHiddenWhenZeroInPiMode(t *testing.T) {
 	}
 }
 
-func TestCostHiddenOnAPiSubscription(t *testing.T) {
-	ctx := &Context{
-		Mode: input.ModePi,
-		Status: input.Status{
-			Cost:         &input.Cost{TotalCostUSD: 1.84},
-			Subscription: true,
-			RateLimits: &input.RateLimits{
-				FiveHour: &input.Window{UsedPercentage: 44},
-			},
-		},
-	}
-	if _, visible := (Cost{}).Render(ctx); visible {
-		t.Error("cost widget visible on a pi subscription inside its limits; want hidden")
-	}
-}
-
-func TestCostHiddenOnAPiSubscriptionWithNoLimitsYet(t *testing.T) {
-	// The same rule as Claude mode's resumed session: no limits is not
-	// overage, so the plan's priced-but-unpaid figure stays off the line.
-	ctx := &Context{
-		Mode:   input.ModePi,
-		Status: input.Status{Cost: &input.Cost{TotalCostUSD: 1.84}, Subscription: true},
-	}
-	if _, visible := (Cost{}).Render(ctx); visible {
-		t.Error("cost widget visible on a pi subscription with no limits; want hidden")
-	}
-}
-
-func TestCostShowsOnAPiSubscriptionInOverage(t *testing.T) {
-	ctx := &Context{
-		Mode: input.ModePi,
-		Status: input.Status{
-			Cost:         &input.Cost{TotalCostUSD: 1.84},
-			Subscription: true,
-			RateLimits: &input.RateLimits{
-				SevenDay: &input.Window{UsedPercentage: 100},
-			},
-		},
-	}
-	text, visible := (Cost{}).Render(ctx)
-	if !visible || !strings.Contains(text, "$1.84") {
-		t.Errorf("cost on a pi subscription in overage = %q (visible %v), want $1.84", text, visible)
+func TestCostShowsSubscriptionIcon(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		cost   *input.Cost
+		limits *input.RateLimits
+	}{
+		{"fresh", nil, nil},
+		{"zero", &input.Cost{}, nil},
+		{"no limits", &input.Cost{TotalCostUSD: 1.84}, nil},
+		{"inside limits", &input.Cost{TotalCostUSD: 1.84}, &input.RateLimits{FiveHour: &input.Window{UsedPercentage: 44}}},
+		{"limit reached", &input.Cost{TotalCostUSD: 1.84}, &input.RateLimits{SevenDay: &input.Window{UsedPercentage: 100}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := &Context{Mode: input.ModePi, Status: input.Status{
+				Subscription: true, Cost: tc.cost, RateLimits: tc.limits,
+			}}
+			text, visible := (Cost{}).Render(ctx)
+			if !visible || !strings.Contains(text, "") || strings.Contains(text, "$") {
+				t.Errorf("subscription widget = %q (visible %v), want membership icon without cost", text, visible)
+			}
+		})
 	}
 }

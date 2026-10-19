@@ -35,7 +35,7 @@ func TestGolden(t *testing.T) {
 		{"pi-full", "120", "", ""},
 		{"pi-narrow", "40", "", ""},
 		// A ChatGPT plan login, as pi-usage reports it: the plan windows feed
-		// the usage widgets, the catalogue-priced cost stays off the line, and
+		// the usage widgets, a membership icon replaces catalogue pricing, and
 		// pi-lens's idle "LSP Inactive" takes no slot.
 		{"pi-subscription", "120", "", ""},
 		{"pi-full", "120", "", "json"},

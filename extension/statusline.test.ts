@@ -74,6 +74,43 @@ const lastUsage = {
 };
 
 describe("buildPayload", () => {
+  it("recognizes OpenAI subscription auth without pi-usage installed", () => {
+    const current = {
+      ...ctx,
+      model: { id: "gpt-6", provider: "openai" },
+      modelRegistry: {
+        isUsingOAuth: () => true,
+        getProvider: () => ({ auth: { oauth: { isSubscription: true } } }),
+      },
+    };
+    expect(buildPayload(current, state({ costUsd: 3.91 }), 0).subscription).toBe(true);
+  });
+
+  it("does not mistake an API key or metered OAuth for a subscription", () => {
+    for (const [oauth, subscription] of [[false, true], [true, false]]) {
+      const current = {
+        ...ctx,
+        model: { id: "gpt-6", provider: "openai" },
+        modelRegistry: {
+          isUsingOAuth: () => oauth,
+          getProvider: () => ({ auth: { oauth: { isSubscription: subscription } } }),
+        },
+      };
+      const payload = buildPayload(current, state({ costUsd: 3.91, planUsage: { subscription: true } }), 0);
+      expect(payload.subscription).toBeUndefined();
+      expect(payload.cost_usd).toBe(3.91);
+    }
+  });
+
+  it("keeps rendering if auth metadata is unavailable", () => {
+    const current = {
+      ...ctx,
+      model: { id: "gpt-6", provider: "openai" },
+      modelRegistry: { isUsingOAuth: () => { throw new Error("unavailable"); } },
+    };
+    expect(buildPayload(current, state(), 0).subscription).toBeUndefined();
+  });
+
   it("stamps the harness discriminator so autodetect works", () => {
     expect(buildPayload(ctx, state(), 0).harness).toBe("pi");
   });

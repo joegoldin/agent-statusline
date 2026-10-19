@@ -29,8 +29,8 @@ type PiStatus struct {
 	// republished on its event bus channel. Empty when that extension is not
 	// installed, or is still drawing its own status slot.
 	AutoMode string `json:"auto_mode"`
-	// Subscription is true when the pi-usage extension reports a consumer
-	// subscription (a ChatGPT or similar plan) for the session's provider.
+	// Subscription is true when auth metadata or a pi-usage report identifies
+	// a consumer subscription for the session's provider.
 	// False is "not known to be one", not "known to be billed per token".
 	Subscription bool `json:"subscription"`
 	// LSP is pi-lens's "pi-lens-lsp" status text, verbatim.

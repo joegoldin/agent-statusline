@@ -282,14 +282,14 @@
       "spans": [
         {
           "kind": "text",
-          "text": "120.0k tokens",
+          "text": "214.0k tokens",
           "intent": "warn"
         }
       ],
       "compact": [
         {
           "kind": "text",
-          "text": "120.0k tok",
+          "text": "214.0k tok",
           "intent": "warn"
         }
       ]

@@ -214,25 +214,25 @@ export function buildPayload(
 
   const windowSize = num(usage?.contextWindow) || num(ctx?.model?.contextWindow);
   const last = state.lastUsage;
-  if (last) {
-    // pi's Usage names the cache-creation bucket `cacheWrite`.
-    payload.context = {
-      window_size: windowSize,
-      input_tokens: num(last.input),
-      output_tokens: num(last.output),
-      cache_read_tokens: num(last.cacheRead),
-      cache_creation_tokens: num(last.cacheWrite),
-    };
-  } else if (usage && typeof usage.tokens === "number") {
-    // No assistant message seen yet (fresh or resumed session). pi's estimate
-    // is a single total, so it lands entirely in input_tokens — that is what
-    // Go's used-context accounting (input + both cache figures) then reports.
+  if (usage && typeof usage.tokens === "number" && Number.isFinite(usage.tokens) && usage.tokens >= 0) {
+    // The runtime accounts for the active conversation, cached input, pending
+    // messages and compaction. A request's uncached input is not that total.
     payload.context = {
       window_size: windowSize,
       input_tokens: usage.tokens,
       output_tokens: 0,
       cache_read_tokens: 0,
       cache_creation_tokens: 0,
+    };
+  } else if (!usage && last) {
+    // Older runtimes may have no context estimator. Preserve their breakdown;
+    // an explicit unknown (e.g. immediately after compaction) must stay unknown.
+    payload.context = {
+      window_size: windowSize,
+      input_tokens: num(last.input),
+      output_tokens: num(last.output),
+      cache_read_tokens: num(last.cacheRead),
+      cache_creation_tokens: num(last.cacheWrite),
     };
   }
 

@@ -67,7 +67,7 @@ func TestDecodePiComputesContextPercentages(t *testing.T) {
 	if cw.RemainingPercentage == nil || *cw.RemainingPercentage < 46.4 || *cw.RemainingPercentage > 46.6 {
 		t.Errorf("RemainingPercentage = %v, want ~46.5", cw.RemainingPercentage)
 	}
-	if cw.TotalInputTokens != 120000 || cw.TotalOutputTokens != 8000 {
+	if cw.TotalInputTokens != 214000 || cw.TotalOutputTokens != 8000 {
 		t.Errorf("totals = %d / %d", cw.TotalInputTokens, cw.TotalOutputTokens)
 	}
 	if cw.CurrentUsage == nil || cw.CurrentUsage.CacheReadInputTokens != 90000 {

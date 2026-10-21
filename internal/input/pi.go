@@ -103,7 +103,7 @@ func DecodePi(r io.Reader) (Status, error) {
 func piContextWindow(c PiContext) *ContextWindow {
 	cw := &ContextWindow{
 		ContextWindowSize: c.WindowSize,
-		TotalInputTokens:  c.InputTokens,
+		TotalInputTokens:  c.InputTokens + c.CacheReadTokens + c.CacheCreationTokens,
 		TotalOutputTokens: c.OutputTokens,
 		CurrentUsage: &CurrentUsage{
 			InputTokens:              c.InputTokens,

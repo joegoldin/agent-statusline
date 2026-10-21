@@ -161,8 +161,8 @@ describe("buildPayload", () => {
     expect(p.model).toEqual({ id: "bare-model", display_name: "bare-model" });
   });
 
-  it("passes the assistant token breakdown through without deriving percentages", () => {
-    const p = buildPayload(ctx, state({ lastUsage }), 0);
+  it("preserves the assistant breakdown when the runtime has no context estimator", () => {
+    const p = buildPayload({ ...ctx, getContextUsage: undefined }, state({ lastUsage }), 0);
     expect(p.context).toEqual({
       window_size: 400000,
       input_tokens: 120000,
@@ -800,13 +800,13 @@ describe("extension entrypoint", () => {
         expect(wire).toBeDefined();
         expect(wire.cost_usd).toBeCloseTo(0.42, 10);
         expect(wire.rate_limits).toEqual({ five_hour: { used_percentage: 12.5, resets_at: 0 } });
-        // The assistant breakdown replaces pi's single-number estimate.
+        // Current context remains authoritative after an assistant completes.
         expect(wire.context).toEqual({
           window_size: 400000,
-          input_tokens: 120000,
-          output_tokens: 8000,
-          cache_read_tokens: 90000,
-          cache_creation_tokens: 4000,
+          input_tokens: 100,
+          output_tokens: 0,
+          cache_read_tokens: 0,
+          cache_creation_tokens: 0,
         });
         // Measured between before_provider_request and the assistant message_end.
         expect(wire.api_duration_ms).toBeGreaterThan(0);
@@ -851,4 +851,16 @@ describe("extension lifecycle", () => {
     expect(src).not.toMatch(/setStatus\?\.\(\s*STATUS_KEY/);
     expect(src).not.toContain("STATUS_KEY");
   });
+});
+
+it("uses live conversation context rather than the latest uncached request count", () => {
+  const current = { ...ctx, getContextUsage: () => ({ tokens: 3100, contextWindow: 400000, percent: 0.775 }) };
+  for (const input of [311, 3100]) {
+    const p = buildPayload(current, state({ lastUsage: { input, output: 10, cacheRead: 3100 - input } }), 0);
+    expect(p.context).toEqual({ window_size: 400000, input_tokens: 3100, output_tokens: 0, cache_read_tokens: 0, cache_creation_tokens: 0 });
+  }
+});
+
+it("does not resurrect pre-compaction usage when current context is unknown", () => {
+  expect(buildPayload({ ...ctx, getContextUsage: () => ({ tokens: null, contextWindow: 400000, percent: null }) }, state({ lastUsage }), 0).context).toBeUndefined();
 });

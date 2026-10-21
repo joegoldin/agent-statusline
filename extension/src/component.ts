@@ -1,6 +1,6 @@
 import type { ThemeLike } from "./intents";
 import { renderRows } from "./layout";
-import type { Snapshot } from "./snapshot";
+import type { Snapshot, Span } from "./snapshot";
 import { truncateEnd } from "./width";
 
 export const WIDGET_KEY = "agent-statusline";
@@ -53,6 +53,26 @@ export interface StatuslineHandle {
 }
 
 const DEFAULT_INTERVAL_MS = 1000;
+const FAST_STATUS_KEY = "pi-fast";
+
+function withFastMode(snapshot: Snapshot, active: boolean): Snapshot {
+  const model = snapshot.widgets.model;
+  if (!active || !model?.visible) return snapshot;
+  // Model spans already include effort. Decorate at render time so a toggle
+  // never waits for the next binary refresh or modifies the cached snapshot.
+  const suffix: Span = { kind: "text", intent: "warn", text: " fast" };
+  return {
+    ...snapshot,
+    widgets: {
+      ...snapshot.widgets,
+      model: {
+        ...model,
+        spans: [...(model.spans ?? []), suffix],
+        compact: model.compact ? [...model.compact, suffix] : undefined,
+      },
+    },
+  };
+}
 
 /**
  * Install the native statusline.
@@ -99,6 +119,15 @@ export function installStatusline(ctx: PiUIContext, deps: InstallDeps): Statusli
     (tickHandle as { unref?: () => void }).unref?.();
   };
 
+  const extensionStatus = (key: string): string | undefined => {
+    try {
+      const text = statuses().get(key);
+      return typeof text === "string" && text !== "" ? text : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
   const clearTick = () => {
     if (tickHandle) clearInterval(tickHandle);
     tickHandle = undefined;
@@ -128,7 +157,7 @@ export function installStatusline(ctx: PiUIContext, deps: InstallDeps): Statusli
       absorbed = new Set();
     }
     for (const [key, text] of entries) {
-      if (key === WIDGET_KEY || absorbed.has(key) || !text) continue;
+      if (key === WIDGET_KEY || key === FAST_STATUS_KEY || absorbed.has(key) || !text) continue;
       for (const line of String(text).split(/[\r\n]+/)) {
         if (!line.trim()) continue;
         const cut = width > 0 ? truncateEnd(line, width) : line;
@@ -190,7 +219,7 @@ export function installStatusline(ctx: PiUIContext, deps: InstallDeps): Statusli
         render(width: number): string[] {
           if (!snapshot) return [];
           try {
-            lastGood = renderRows(snapshot, width, theme, now());
+            lastGood = renderRows(withFastMode(snapshot, extensionStatus(FAST_STATUS_KEY) === "fast"), width, theme, now());
           } catch {
             // A statusline must never break the session: keep the last frame.
           }
@@ -207,14 +236,7 @@ export function installStatusline(ctx: PiUIContext, deps: InstallDeps): Statusli
       armTick();
       tuiRef?.requestRender();
     },
-    extensionStatus(key: string) {
-      try {
-        const text = statuses().get(key);
-        return typeof text === "string" && text !== "" ? text : undefined;
-      } catch {
-        return undefined;
-      }
-    },
+    extensionStatus,
     dispose() {
       disposed = true;
       clearTick();

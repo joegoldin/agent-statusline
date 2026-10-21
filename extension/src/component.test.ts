@@ -73,6 +73,42 @@ describe("installStatusline", () => {
     expect(f.footer()!.render(120)).toEqual([]);
   });
 
+  it("renders fast once after model and effort, in a distinct color, and clears it immediately", () => {
+    const statuses = new Map([["pi-fast", "fast"]]);
+    const f = fakeUI(statuses);
+    const h = installStatusline(f.ctx as any, {});
+    const model = { visible: true, spans: [{ kind: "text" as const, intent: "accent" as const, text: "Sol xhigh" }],
+      compact: [{ kind: "text" as const, intent: "accent" as const, text: "Sol xh" }] };
+    const fixture = { ...snap, widgets: { ...snap.widgets, model },
+      config: { ...snap.config, row1: ["model"], row2: [], row3: [], row4: [], padding: 0, activityRows: 0 } };
+    h.setSnapshot(fixture);
+    const render = (width: number) => f.widgets.get(WIDGET_KEY)!.component.render(width).join("\n");
+    const plain = (value: string) => value.replace(/\x1b\[[0-9;]*m/g, "");
+    try {
+      expect(plain(render(200))).toContain("Sol xhigh fast");
+      expect(plain(render(200)).match(/fast/g)).toHaveLength(1);
+      expect(f.calls()).toContainEqual(["warning", " fast"]);
+      expect(f.calls()).toContainEqual(["accent", "Sol xhigh"]);
+      expect(plain(render(60))).toContain("Sol xh fast");
+      expect(model.spans).toHaveLength(1);
+      expect(model.compact).toHaveLength(1);
+      statuses.delete("pi-fast");
+      expect(plain(render(200))).not.toContain("fast");
+    } finally { h.dispose(); }
+  });
+
+  it("keeps drawing the dashboard if the fast-status lookup fails", () => {
+    const statuses = new Map<string, string>();
+    statuses.get = () => { throw new Error("status unavailable"); };
+    const f = fakeUI(statuses);
+    const h = installStatusline(f.ctx as any, {});
+    h.setSnapshot(snap);
+    try {
+      const rows = f.widgets.get(WIDGET_KEY)!.component.render(200);
+      expect(rows.join("\n")).toContain(snap.widgets.model.spans![0].text!);
+    } finally { h.dispose(); }
+  });
+
   it("never routes rows through setStatus", () => {
     const f = fakeUI();
     const h = installStatusline(f.ctx as any, {});

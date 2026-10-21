@@ -66,6 +66,13 @@ prove extra charges. API-key and metered OAuth sessions retain the dollar
 figure. Plan percentages remain account-wide; no per-conversation share is
 inferred from them. Claude's existing usage and cost display is unchanged.
 
+The first-party `pi-fast` plugin in pi-nix publishes the `pi-fast` status key
+as `fast` only when priority inference is enabled for a supported current
+model. The Pi renderer appends a warning-colored `fast` after the model and
+reasoning effort, including the compact form. It reads the status map on each
+frame, so toggles do not wait for a binary refresh, and suppresses the duplicate
+status row. An absent status leaves the model display unchanged.
+
 Other extensions' status lines are redrawn under the statusline, since it
 takes pi's footer. `pi-lens-lsp` is not, because the `lsp` widget draws it,
 and neither is pi-usage's `usage` line while its plan windows are what the

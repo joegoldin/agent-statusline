@@ -30,6 +30,21 @@ and it is how you tell a Go bug from a TypeScript one: run the binary by hand
 with a captured payload and see whether the numbers are right before blaming
 the renderer. `internal/e2e/testdata/pi-*.golden` keep it under test.
 
+## Compact Pi response timing
+
+The first dashboard line reserves up to 16 cells at the right for response
+performance, using clock and lightning icons from Nerd Font. While waiting,
+a four-cell bar follows the mean first-token latency of the last 12 successful
+requests for that provider/model. A first request, or a wait beyond the estimate,
+shows elapsed time instead; the bar is not response-completion progress.
+
+Streaming shows an approximate tokens/second rate (`~`, based on characters/4)
+and elapsed request time. Thinking and tool-argument deltas count as activity.
+After completion the slot retains first-token latency and output tokens/second
+from final usage, excluding the initial wait. Missing usage shows `—`, not an
+invented count. Failed or cancelled requests do not train the estimate. History
+is session-local; very narrow terminals hide the slot rather than wrap it.
+
 ## What the pi extension reads from other extensions
 
 A few pi payload fields come from other pi extensions rather than from pi

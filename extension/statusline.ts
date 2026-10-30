@@ -3,7 +3,8 @@
 // Deliberately thin: it serialises only what pi natively exposes and lets the
 // Go binary derive everything else (percentages, workspace fields, cost
 // gating). Translation logic lives in Go because that is where the golden
-// tests are.
+// tests are. Request timing stays local so streaming updates repaint without
+// spawning the binary for every token.
 //
 // The structural interfaces below mirror the real pi type definitions shipped
 // in @earendil-works/pi-coding-agent (core/extensions/types.d.ts) and
@@ -14,7 +15,8 @@
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-import { installStatusline } from "./src/component";
+import { installStatusline, type StatuslineHandle } from "./src/component";
+import { registerPerformance } from "./src/performance";
 import { parseSnapshot } from "./src/snapshot";
 
 // ---------------------------------------------------------------------------
@@ -574,9 +576,8 @@ export default function (pi: any) {
   state.version = readPiVersion();
   const binary = process.env.AGENT_STATUSLINE_BIN ?? "agent-statusline";
   let providerStartedAt = 0;
-  let handle:
-    | { setSnapshot(s: any): void; extensionStatus(key: string): string | undefined; dispose(): void }
-    | undefined;
+  let handle: StatuslineHandle | undefined;
+  const timing = registerPerformance(pi, () => handle?.requestRender());
   let poll: ReturnType<typeof setInterval> | undefined;
   let inFlight = false;
   let pendingRefresh = false;
@@ -707,6 +708,7 @@ export default function (pi: any) {
     handle = installStatusline(ctx as any, {
       onDataStale: () => void refresh(ctx),
       absorbedStatusKeys: () => absorbedStatusKeys(state, lastCtx?.model?.provider),
+      performance: () => timing.render(performance.now()),
     });
     if (poll) clearInterval(poll);
     poll = setInterval(() => void refresh(ctx), DATA_POLL_MS);

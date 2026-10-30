@@ -1,4 +1,4 @@
-import type { ThemeLike } from "./intents";
+import { paint, type ThemeLike } from "./intents";
 import { renderRows } from "./layout";
 import type { Snapshot, Span } from "./snapshot";
 import { truncateEnd } from "./width";
@@ -39,9 +39,11 @@ export interface InstallDeps {
    */
   absorbedStatusKeys?: () => ReadonlySet<string>;
   now?: () => number;
+  performance?: () => Span[];
 }
 
 export interface StatuslineHandle {
+  requestRender(): void;
   setSnapshot(s: Snapshot): void;
   /**
    * Another extension's setStatus text. Taking the footer made this component
@@ -90,6 +92,7 @@ function withFastMode(snapshot: Snapshot, active: boolean): Snapshot {
  */
 export function installStatusline(ctx: PiUIContext, deps: InstallDeps): StatuslineHandle {
   const noop: StatuslineHandle = {
+    requestRender() {},
     setSnapshot() {},
     extensionStatus: () => undefined,
     dispose() {},
@@ -219,7 +222,8 @@ export function installStatusline(ctx: PiUIContext, deps: InstallDeps): Statusli
         render(width: number): string[] {
           if (!snapshot) return [];
           try {
-            lastGood = renderRows(withFastMode(snapshot, extensionStatus(FAST_STATUS_KEY) === "fast"), width, theme, now());
+            const badge = paint(deps.performance?.() ?? [], theme, snapshot.config);
+            lastGood = renderRows(withFastMode(snapshot, extensionStatus(FAST_STATUS_KEY) === "fast"), width, theme, now(), badge);
           } catch {
             // A statusline must never break the session: keep the last frame.
           }
@@ -231,6 +235,7 @@ export function installStatusline(ctx: PiUIContext, deps: InstallDeps): Statusli
   );
 
   return {
+    requestRender() { tuiRef?.requestRender(); },
     setSnapshot(s: Snapshot) {
       snapshot = s;
       armTick();

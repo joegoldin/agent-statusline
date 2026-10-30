@@ -297,3 +297,26 @@ describe("installStatusline", () => {
     expect(f.requestRender).toHaveBeenCalled();
   });
 });
+
+it("pins performance on the first row without adding a row and fits narrow terminals", () => {
+  const f = fakeUI();
+  let badge = "\uf0172.1s \uf0e782t/s";
+  const h = installStatusline(f.ctx as any, { performance: () => [{ kind: "text", intent: "accent", text: badge }] });
+  h.setSnapshot(snap);
+  const plain = (value: string) => value.replace(/\x1b\[[0-9;]*m/g, "");
+  try {
+    for (const width of [30, 60, 120, 200]) {
+      const rows = f.widgets.get(WIDGET_KEY)!.component.render(width).map(plain);
+      expect(rows[0].endsWith(badge)).toBe(true);
+      expect(rows[0].length).toBeLessThanOrEqual(width);
+      expect(rows.join("\n").split(badge)).toHaveLength(2);
+      expect(rows.length).toBeLessThanOrEqual(snap.config.maxLines);
+    }
+    expect(f.widgets.get(WIDGET_KEY)!.component.render(8).join("")).not.toContain(badge);
+    badge = "";
+    expect(f.widgets.get(WIDGET_KEY)!.component.render(120).join("")).not.toContain("82t/s");
+    f.requestRender.mockClear();
+    h.requestRender();
+    expect(f.requestRender).toHaveBeenCalledTimes(1);
+  } finally { h.dispose(); }
+});

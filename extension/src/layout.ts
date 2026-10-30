@@ -126,7 +126,7 @@ export function composeRow(
  * dropped. Flex spacers are ignored: right-alignment is meaningless once
  * content wraps.
  */
-export function wrapRow(names: string[], snap: Snapshot, width: number, theme: ThemeLike): string[] {
+export function wrapRow(names: string[], snap: Snapshot, width: number, theme: ThemeLike, firstWidth = width): string[] {
   const sep = snap.config.separator;
   const texts = segments(names, snap, width, theme)
     .filter((s) => !s.flex)
@@ -142,7 +142,7 @@ export function wrapRow(names: string[], snap: Snapshot, width: number, theme: T
     if (cur === "") {
       cur = t;
       curW = tw;
-    } else if (width > 0 && curW + sepW + tw > width) {
+    } else if (width > 0 && curW + sepW + tw > (lines.length === 0 ? firstWidth : width)) {
       lines.push(cur);
       cur = t;
       curW = tw;
@@ -152,7 +152,10 @@ export function wrapRow(names: string[], snap: Snapshot, width: number, theme: T
     }
   }
   if (cur !== "") lines.push(cur);
-  return width > 0 ? lines.map((l) => (visibleWidth(l) > width ? truncateEnd(l, width) : l)) : lines;
+  return width > 0 ? lines.map((l, i) => {
+    const limit = i === 0 ? firstWidth : width;
+    return visibleWidth(l) > limit ? truncateEnd(l, limit) : l;
+  }) : lines;
 }
 
 /**
@@ -175,13 +178,18 @@ export function renderRows(
   width: number,
   theme: ThemeLike,
   now: number,
+  right = "",
 ): string[] {
   const cfg = snap.config;
   const sep = cfg.separator;
   const maxLines = cfg.maxLines > 0 ? cfg.maxLines : 6;
 
+  // Only the first line reserves the badge; lower rows keep their full width.
+  const rightWidth = visibleWidth(right);
+  const pinned = right && width >= rightWidth + Math.max(0, cfg.padding) + 8 ? right : "";
+  const firstWidth = pinned ? width - rightWidth - 2 - Math.max(0, cfg.padding) : width;
   const names = [...(cfg.row1 ?? []), ...(cfg.row2 ?? []), ...(cfg.row3 ?? []), ...(cfg.row4 ?? [])];
-  const dashboard = wrapRow(names, snap, width, theme)
+  const dashboard = wrapRow(names, snap, width, theme, firstWidth)
     .filter((l) => l.trim().length > 0)
     .slice(0, maxLines);
 
@@ -191,7 +199,7 @@ export function renderRows(
   const last = dashboard.length - 1;
   if (activity.length > 0 && last >= 0) {
     const joined = dashboard[last] + sep + activity[0];
-    if (width <= 0 || visibleWidth(joined) <= width) {
+    if (width <= 0 || visibleWidth(joined) <= (last === 0 ? firstWidth : width)) {
       dashboard[last] = joined;
       activity.shift();
     }
@@ -199,7 +207,12 @@ export function renderRows(
 
   const padding = cfg.padding > 0 ? cfg.padding : 0;
   const pad = padding > 0 ? " ".repeat(padding) : "";
-  return [...dashboard, ...activity.slice(0, Math.max(0, budget))]
+  const rows = [...dashboard, ...activity.slice(0, Math.max(0, budget))]
     .map((l) => (pad ? pad + truncateEnd(l, width - padding) : l))
     .filter((l) => l.trim().length > 0);
+  if (pinned) {
+    const left = truncateEnd(rows[0] ?? "", width - rightWidth - 2);
+    rows[0] = left + " ".repeat(Math.max(2, width - visibleWidth(left) - rightWidth)) + pinned;
+  }
+  return rows;
 }

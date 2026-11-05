@@ -32,8 +32,10 @@ the renderer. `internal/e2e/testdata/pi-*.golden` keep it under test.
 
 ## Compact Pi response timing
 
-The first dashboard line reserves up to 16 cells at the right for response
-performance, using clock and lightning icons from Nerd Font. While waiting,
+The first dashboard line docks conversation context usage beside response
+performance on the right. Narrow terminals keep context in the left flow.
+Response performance uses up to 16 cells, with clock and lightning icons from
+Nerd Font. While waiting,
 a four-cell bar follows the mean first-token latency of the last 12 successful
 requests for that provider/model. A first request, or a wait beyond the estimate,
 shows elapsed time instead; the bar is not response-completion progress.
@@ -88,8 +90,9 @@ reasoning effort, including the compact form. It reads the status map on each
 frame, so toggles do not wait for a binary refresh, and suppresses the duplicate
 status row. An absent status leaves the model display unchanged.
 
-Other extensions' status lines are redrawn under the statusline, since it
-takes pi's footer. `pi-lens-lsp` is not, because the `lsp` widget draws it,
+Other extensions' status chips join the dashboard flow, wrapping only when
+needed, since it takes pi's footer. Pi no longer draws a separate live-command
+activity row; the transcript already shows tool execution. `pi-lens-lsp` is not, because the `lsp` widget draws it,
 and neither is pi-usage's `usage` line while its plan windows are what the
 usage widgets show. An API-key balance has no widget, so that line stays.
 

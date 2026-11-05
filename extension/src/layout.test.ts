@@ -166,13 +166,13 @@ describe("renderRows", () => {
     expect(renderRows(empty, 80, theme, NOW)).toEqual([]);
   });
 
-  it("keeps the clocks live between snapshots", () => {
+  it("no longer allocates a live command row between snapshots", () => {
     // The whole reason the component owns a tick: nothing about the snapshot
     // changes here, only the render clock, and the output must still move.
     const { theme } = recordingTheme();
     const at0 = renderRows(snap, 120, theme, NOW).join("\n");
     const at7 = renderRows(snap, 120, theme, NOW + 7000).join("\n");
-    expect(at7).not.toBe(at0);
+    expect(at7).toBe(at0);
   });
 
   it("packs rows 3 and 4 onto the dashboard's lines when they fit", () => {
@@ -192,6 +192,7 @@ describe("renderRows", () => {
     };
     const c = quiet.config;
     const names = [...(c.row1 ?? []), ...(c.row2 ?? []), ...(c.row3 ?? []), ...(c.row4 ?? [])];
+    quiet.config = { ...c, hide: [...c.hide, "context"] };
     for (const width of [60, 80, 120]) {
       expect(renderRows(quiet, width, theme, NOW)).toEqual(wrapRow(names, quiet, width, theme));
     }
@@ -213,4 +214,17 @@ describe("renderRows", () => {
     const hidden: Snapshot = { ...withRows, config: { ...withRows.config, hide: ["autoMode", "cache"] } };
     expect(renderRows(hidden, 400, theme, NOW)).toEqual(renderRows(withoutExtraRows(snap), 400, theme, NOW));
   });
+});
+
+
+it("docks context beside performance and removes live command activity", () => {
+ const { theme } = recordingTheme();
+ const fixture: Snapshot = { ...snap, widgets: { model: { visible: true, spans: [{ kind: "text", text: "MODEL" }] }, context: { visible: true, spans: [{ kind: "text", text: "CTX70%" }] } },
+ config: { ...snap.config, row1: ["model", "context"], row2: [], row3: [], row4: [], padding: 0 },
+ activity: { ...snap.activity, tools: [{ id: "1", name: "find", state: "running", startedAtMs: NOW - 4000 }], agents: [], todos: null } };
+ const rows = renderRows(fixture, 100, theme, NOW, "80t/s");
+ expect(rows).toHaveLength(1);
+ const plain = rows[0].replace(/\x1b\[[0-9;]*m/g, "");
+ expect(plain).toMatch(/MODEL\s{10,}CTX70%.*80t\/s$/);
+ expect(rows.join("\n")).not.toContain("find");
 });

@@ -223,11 +223,11 @@ export function installStatusline(ctx: PiUIContext, deps: InstallDeps): Statusli
           if (!snapshot) return [];
           try {
             const badge = paint(deps.performance?.() ?? [], theme, snapshot.config);
-            lastGood = renderRows(withFastMode(snapshot, extensionStatus(FAST_STATUS_KEY) === "fast"), width, theme, now(), badge);
+            lastGood = renderRows(withFastMode(snapshot, extensionStatus(FAST_STATUS_KEY) === "fast"), width, theme, now(), badge, foreignStatusRows(width, theme));
           } catch {
             // A statusline must never break the session: keep the last frame.
           }
-          return [...lastGood, ...foreignStatusRows(width, theme)];
+          return lastGood;
         },
       };
     },

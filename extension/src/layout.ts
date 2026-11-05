@@ -126,11 +126,11 @@ export function composeRow(
  * dropped. Flex spacers are ignored: right-alignment is meaningless once
  * content wraps.
  */
-export function wrapRow(names: string[], snap: Snapshot, width: number, theme: ThemeLike, firstWidth = width): string[] {
+export function wrapRow(names: string[], snap: Snapshot, width: number, theme: ThemeLike, firstWidth = width, tail: string[] = []): string[] {
   const sep = snap.config.separator;
   const texts = segments(names, snap, width, theme)
     .filter((s) => !s.flex)
-    .map((s) => s.text);
+    .map((s) => s.text).concat(tail);
   if (texts.length === 0) return [];
 
   const sepW = visibleWidth(sep);
@@ -179,23 +179,30 @@ export function renderRows(
   theme: ThemeLike,
   now: number,
   right = "",
+  inline: string[] = [],
 ): string[] {
   const cfg = snap.config;
   const sep = cfg.separator;
   const maxLines = cfg.maxLines > 0 ? cfg.maxLines : 6;
 
-  // Only the first line reserves the badge; lower rows keep their full width.
-  const rightWidth = visibleWidth(right);
-  const pinned = right && width >= rightWidth + Math.max(0, cfg.padding) + 8 ? right : "";
-  const firstWidth = pinned ? width - rightWidth - 2 - Math.max(0, cfg.padding) : width;
   const names = [...(cfg.row1 ?? []), ...(cfg.row2 ?? []), ...(cfg.row3 ?? []), ...(cfg.row4 ?? [])];
-  const dashboard = wrapRow(names, snap, width, theme, firstWidth)
+  const context = names.includes("context") ? segments(["context"], snap, width, theme)[0]?.text ?? "" : "";
+  // Keep the context meter with the response clock, not lost in the left flow.
+  // Narrow terminals retain the context in the flow rather than dropping it.
+  const combined = [context, right].filter(Boolean).join(sep);
+  const dockContext = !!context && width >= cfg.compactWidth && width >= visibleWidth(combined) + Math.max(0, cfg.padding) + 10;
+  const dock = dockContext ? combined : right;
+  const rightWidth = visibleWidth(dock);
+  const pinned = dock && width >= rightWidth + Math.max(0, cfg.padding) + 8 ? dock : "";
+  const firstWidth = pinned ? width - rightWidth - 2 - Math.max(0, cfg.padding) : width;
+  const flow = dockContext ? names.filter(name => name !== "context") : names;
+  const dashboard = wrapRow(flow, snap, width, theme, firstWidth, inline)
     .filter((l) => l.trim().length > 0)
-    .slice(0, maxLines);
+    .slice(0, inline.length ? undefined : maxLines);
 
   const budget = Math.min(maxLines - dashboard.length, cfg.activityRows ?? 0);
   // Asked for one extra row, in case the first activity line moves up.
-  const activity = budget > 0 ? activityRows(snap, width, theme, now, budget + 1) : [];
+  const activity = budget > 0 ? activityRows({ ...snap, activity: { ...snap.activity, tools: [] } }, width, theme, now, budget + 1) : [];
   const last = dashboard.length - 1;
   if (activity.length > 0 && last >= 0) {
     const joined = dashboard[last] + sep + activity[0];

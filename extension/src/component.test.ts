@@ -320,3 +320,16 @@ it("pins performance on the first row without adding a row and fits narrow termi
     expect(f.requestRender).toHaveBeenCalledTimes(1);
   } finally { h.dispose(); }
 });
+
+it("packs extension chips into available dashboard space", () => {
+  const f = fakeUI(new Map([["background-tasks", "⚙ bg 2↻ · 1✗"], ["automode", "auto 3/100"]]));
+  const h = installStatusline(f.ctx as any, { performance: () => [{ kind: "text", text: "80t/s" }] });
+  h.setSnapshot({ ...snap, config: { ...snap.config, row1: ["model"], row2: [], row3: [], row4: [], padding: 0 }, activity: { ...snap.activity, tools: [], agents: [], todos: null } });
+  try {
+    const rows = f.widgets.get(WIDGET_KEY)!.component.render(120);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toContain("bg 2↻");
+    expect(rows[0]).toContain("auto 3/100");
+    expect(rows[0].replace(/\x1b\[[0-9;]*m/g, "").endsWith("80t/s")).toBe(true);
+  } finally { h.dispose(); }
+});

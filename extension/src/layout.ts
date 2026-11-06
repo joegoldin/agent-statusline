@@ -164,8 +164,8 @@ export function wrapRow(names: string[], snap: Snapshot, width: number, theme: T
  * Every dashboard widget, rows 1 to 4 in order, is packed into as few lines as
  * fit: a line breaks only when the next widget would not fit on it, so a widget
  * left over from row 1 shares its line with row 2's rather than taking a line
- * of its own. Nothing is truncated. A single activity line joins the last
- * dashboard line when it fits there too; otherwise activity fills what is left
+ * of its own. Nothing is truncated. Speed and context keep separate right-aligned rows. A single
+ * activity line joins the last dashboard line when it fits there too; otherwise activity fills what is left
  * of the line budget, as before.
  *
  * This packs tighter than main.go, which keeps rows 1 and 2 as separate wrapped
@@ -186,27 +186,37 @@ export function renderRows(
   const maxLines = cfg.maxLines > 0 ? cfg.maxLines : 6;
 
   const names = [...(cfg.row1 ?? []), ...(cfg.row2 ?? []), ...(cfg.row3 ?? []), ...(cfg.row4 ?? [])];
-  const context = names.includes("context") ? segments(["context"], snap, width, theme)[0]?.text ?? "" : "";
-  // Keep the context meter with the response clock, not lost in the left flow.
-  // Narrow terminals retain the context in the flow rather than dropping it.
-  const combined = [context, right].filter(Boolean).join(sep);
-  const dockContext = !!context && width >= cfg.compactWidth && width >= visibleWidth(combined) + Math.max(0, cfg.padding) + 10;
-  const dock = dockContext ? combined : right;
-  const rightWidth = visibleWidth(dock);
-  const pinned = dock && width >= rightWidth + Math.max(0, cfg.padding) + 8 ? dock : "";
-  const firstWidth = pinned ? width - rightWidth - 2 - Math.max(0, cfg.padding) : width;
-  const flow = dockContext ? names.filter(name => name !== "context") : names;
-  const dashboard = wrapRow(flow, snap, width, theme, firstWidth, inline)
+  const cost = snap.widgets.cost;
+  const model = snap.widgets.model;
+  // Membership is part of the model identity; metered API costs remain an
+  // independent widget with the usual separator. Keep each span's own colour.
+  if (names.includes("model") && names.includes("cost") && !cfg.hide.includes("cost") && model?.visible && cost?.visible && cost.spans?.length === 1 && cost.spans[0].text === "") {
+    const suffix: Span[] = [{ kind: "text", text: " " }, ...cost.spans];
+    snap = { ...snap, widgets: { ...snap.widgets,
+      model: { ...model, spans: [...(model.spans ?? []), ...suffix], compact: [...(model.compact ?? model.spans ?? []), ...suffix] },
+      cost: { ...cost, visible: false },
+    } };
+  }
+  const context = segments(["tokens", "context"].filter(name => names.includes(name)), snap, width, theme).map(segment => segment.text).join(sep);
+  // Preserve each metric's painted spans, but give speed and context their
+  // own rows so neither competes with the identity line for horizontal space.
+  const metrics = [right, context].filter(Boolean).slice(0, maxLines).map(text => {
+    const fitted = width > 0 ? truncateEnd(text, width) : text;
+    return " ".repeat(Math.max(0, width - visibleWidth(fitted))) + fitted;
+  });
+  // Voice is already visible in the prompt; its backend mode is not a status.
+  const flow = names.filter(name => name !== "context" && name !== "tokens" && name !== "voice");
+  const dashboard = wrapRow(flow, snap, width, theme, width, inline)
     .filter((l) => l.trim().length > 0)
-    .slice(0, inline.length ? undefined : maxLines);
+    .slice(0, inline.length ? undefined : Math.max(0, maxLines - metrics.length));
 
-  const budget = Math.min(maxLines - dashboard.length, cfg.activityRows ?? 0);
+  const budget = Math.min(maxLines - dashboard.length - metrics.length, cfg.activityRows ?? 0);
   // Asked for one extra row, in case the first activity line moves up.
   const activity = budget > 0 ? activityRows({ ...snap, activity: { ...snap.activity, tools: [] } }, width, theme, now, budget + 1) : [];
   const last = dashboard.length - 1;
   if (activity.length > 0 && last >= 0) {
     const joined = dashboard[last] + sep + activity[0];
-    if (width <= 0 || visibleWidth(joined) <= (last === 0 ? firstWidth : width)) {
+    if (width <= 0 || visibleWidth(joined) <= width) {
       dashboard[last] = joined;
       activity.shift();
     }
@@ -217,9 +227,5 @@ export function renderRows(
   const rows = [...dashboard, ...activity.slice(0, Math.max(0, budget))]
     .map((l) => (pad ? pad + truncateEnd(l, width - padding) : l))
     .filter((l) => l.trim().length > 0);
-  if (pinned) {
-    const left = truncateEnd(rows[0] ?? "", width - rightWidth - 2);
-    rows[0] = left + " ".repeat(Math.max(2, width - visibleWidth(left) - rightWidth)) + pinned;
-  }
-  return rows;
+  return [...rows, ...metrics];
 }

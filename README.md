@@ -32,8 +32,12 @@ the renderer. `internal/e2e/testdata/pi-*.golden` keep it under test.
 
 ## Compact Pi response timing
 
-The first dashboard line docks conversation context usage beside response
-performance on the right. Narrow terminals keep context in the left flow.
+Response performance and conversation context usage each have their own
+right-aligned line below the dashboard, retaining their existing icons, colours
+and meter styles. The conversation token count and context percentage share
+the context line, with the usual pipe separator. The native footer keeps these
+below expanded Lens and Jobs widgets regardless of extension load order.
+The redundant voice backend-mode label is hidden in Pi.
 Response performance uses up to 16 cells, with clock and lightning icons from
 Nerd Font. While waiting,
 a four-cell bar follows the mean first-token latency of the last 12 successful
@@ -90,9 +94,15 @@ reasoning effort, including the compact form. It reads the status map on each
 frame, so toggles do not wait for a binary refresh, and suppresses the duplicate
 status row. An absent status leaves the model display unchanged.
 
+The subscription icon follows the model and effort with a space, without a
+pipe. Metered API costs keep their separate widget.
+
 Other extensions' status chips join the dashboard flow, wrapping only when
-needed, since it takes pi's footer. Pi no longer draws a separate live-command
-activity row; the transcript already shows tool execution. `pi-lens-lsp` is not, because the `lsp` widget draws it,
+needed, since it takes pi's footer. Compact Lens joins this flow too: clicking
+its chip opens detail rows, and Ctrl+O expands it with the other widgets.
+Without a statusline consumer, Lens retains its standalone control.
+Pi no longer draws a separate live-command activity row; the transcript already
+shows tool execution. `pi-lens-lsp` is skipped because the `lsp` widget draws it,
 and neither is pi-usage's `usage` line while its plan windows are what the
 usage widgets show. An API-key balance has no widget, so that line stays.
 

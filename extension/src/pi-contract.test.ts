@@ -103,7 +103,7 @@ describe("pi footer sink contract", () => {
     // row being fed to a single-line, space-collapsing sink.
     const observed: Array<string | undefined> = [];
     const { theme } = recordingTheme();
-    let widget: { render(width: number): string[] } | undefined;
+    let footer: { render(width: number): string[] } | undefined;
     const ui = {
       setStatus: (_k: string, text: string | undefined) => {
         observed.push(text === undefined ? undefined : sanitizeStatusText(text));
@@ -114,11 +114,11 @@ describe("pi footer sink contract", () => {
         }
       },
       setWidget: (_k: string, factory: any) => {
-        widget = factory ? factory({ requestRender() {} }, theme) : undefined;
+        if (factory) throw new Error("The statusline must use the native footer, not an extension widget");
       },
       setFooter: (factory: any) => {
         if (factory) {
-          factory({ requestRender() {} }, theme, {
+          footer = factory({ requestRender() {} }, theme, {
             getGitBranch: () => "main",
             getExtensionStatuses: () => new Map(),
             getAvailableProviderCount: () => 1,
@@ -132,7 +132,8 @@ describe("pi footer sink contract", () => {
     handle.setSnapshot(snap);
     // Render too: the phase-1 bug lived on the output path, not the install
     // path, so a test that never draws a frame would not have seen it.
-    widget?.render(120);
+    expect(footer).toBeDefined();
+    footer!.render(120);
     handle.dispose();
     expect(observed.every((v) => v === undefined)).toBe(true);
   });

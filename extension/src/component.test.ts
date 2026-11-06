@@ -64,13 +64,13 @@ function fakeUI(extensionStatuses = new Map<string, string>()) {
 }
 
 describe("installStatusline", () => {
-  it("registers one belowEditor widget and blanks the footer", () => {
+  it("uses the native footer so Lens and Jobs always precede the dashboard", () => {
     const f = fakeUI();
-    installStatusline(f.ctx as any, {});
-    expect(f.widgets.has(WIDGET_KEY)).toBe(true);
-    expect(f.widgets.size).toBe(1);
-    expect(f.widgets.get(WIDGET_KEY)!.options.placement).toBe("belowEditor");
-    expect(f.footer()!.render(120)).toEqual([]);
+    const handle = installStatusline(f.ctx as any, {});
+    handle.setSnapshot(snap);
+    expect(f.widgets.size).toBe(0);
+    expect(f.footer().render(120).length).toBeGreaterThan(0);
+    handle.dispose();
   });
 
   it("renders fast once after model and effort, in a distinct color, and clears it immediately", () => {
@@ -82,7 +82,7 @@ describe("installStatusline", () => {
     const fixture = { ...snap, widgets: { ...snap.widgets, model },
       config: { ...snap.config, row1: ["model"], row2: [], row3: [], row4: [], padding: 0, activityRows: 0 } };
     h.setSnapshot(fixture);
-    const render = (width: number) => f.widgets.get(WIDGET_KEY)!.component.render(width).join("\n");
+    const render = (width: number) => f.footer().render(width).join("\n");
     const plain = (value: string) => value.replace(/\x1b\[[0-9;]*m/g, "");
     try {
       expect(plain(render(200))).toContain("Sol xhigh fast");
@@ -104,7 +104,7 @@ describe("installStatusline", () => {
     const h = installStatusline(f.ctx as any, {});
     h.setSnapshot(snap);
     try {
-      const rows = f.widgets.get(WIDGET_KEY)!.component.render(200);
+      const rows = f.footer().render(200);
       expect(rows.join("\n")).toContain(snap.widgets.model.spans![0].text!);
     } finally { h.dispose(); }
   });
@@ -113,7 +113,7 @@ describe("installStatusline", () => {
     const f = fakeUI();
     const h = installStatusline(f.ctx as any, {});
     h.setSnapshot(snap);
-    f.widgets.get(WIDGET_KEY)!.component.render(120);
+    f.footer().render(120);
     for (const [, text] of f.setStatusCalls) {
       expect(text).toBeUndefined();
     }
@@ -129,14 +129,14 @@ describe("installStatusline", () => {
   it("renders nothing until a snapshot arrives", () => {
     const f = fakeUI();
     installStatusline(f.ctx as any, {});
-    expect(f.widgets.get(WIDGET_KEY)!.component.render(120)).toEqual([]);
+    expect(f.footer().render(120)).toEqual([]);
   });
 
   it("renders rows once a snapshot is set", () => {
     const f = fakeUI();
     const h = installStatusline(f.ctx as any, {});
     h.setSnapshot(snap);
-    expect(f.widgets.get(WIDGET_KEY)!.component.render(120).length).toBeGreaterThan(0);
+    expect(f.footer().render(120).length).toBeGreaterThan(0);
   });
 
   it("appends other extensions' status lines, which we displaced", () => {
@@ -148,7 +148,7 @@ describe("installStatusline", () => {
     );
     const h = installStatusline(f.ctx as any, {});
     h.setSnapshot(snap);
-    const rows = f.widgets.get(WIDGET_KEY)!.component.render(200).join("\n");
+    const rows = f.footer().render(200).join("\n");
     expect(rows).toContain("other line one");
     expect(rows).toContain("other line two");
     expect(rows).not.toContain("stale");
@@ -165,7 +165,7 @@ describe("installStatusline", () => {
     let absorbed = new Set(["pi-lens-lsp", "usage"]);
     const h = installStatusline(f.ctx as any, { absorbedStatusKeys: () => absorbed });
     h.setSnapshot(snap);
-    const render = () => f.widgets.get(WIDGET_KEY)!.component.render(200).join("\n");
+    const render = () => f.footer().render(200).join("\n");
     expect(render()).not.toContain("LSP Active");
     expect(render()).not.toContain("chatgpt plan");
     expect(render()).toContain("other line");
@@ -184,7 +184,7 @@ describe("installStatusline", () => {
       },
     });
     h.setSnapshot(snap);
-    expect(f.widgets.get(WIDGET_KEY)!.component.render(200).join("\n")).toContain("openrouter $4.20 left");
+    expect(f.footer().render(200).join("\n")).toContain("openrouter $4.20 left");
   });
 
   it("reads another extension's status text through the footer it took", () => {
@@ -240,7 +240,7 @@ describe("installStatusline", () => {
     jest.useRealTimers();
   });
 
-  it("removes the widget and restores the footer on dispose", () => {
+  it("restores the native footer on dispose", () => {
     const f = fakeUI();
     const h = installStatusline(f.ctx as any, {});
     h.dispose();
@@ -281,11 +281,11 @@ describe("installStatusline", () => {
     const f = fakeUI();
     const h = installStatusline(f.ctx as any, {});
     h.setSnapshot(snap);
-    const good = f.widgets.get(WIDGET_KEY)!.component.render(120);
+    const good = f.footer().render(120);
     // A snapshot parseSnapshot would have refused. The component is the last
     // line of defence: a statusline must never take the session down with it.
     h.setSnapshot({ ...snap, config: null as any });
-    expect(f.widgets.get(WIDGET_KEY)!.component.render(120)).toEqual(good);
+    expect(f.footer().render(120)).toEqual(good);
   });
 
   it("repaints when the theme changes, via invalidate", () => {
@@ -293,12 +293,12 @@ describe("installStatusline", () => {
     const h = installStatusline(f.ctx as any, {});
     h.setSnapshot(snap);
     f.requestRender.mockClear();
-    f.widgets.get(WIDGET_KEY)!.component.invalidate();
+    f.footer().invalidate();
     expect(f.requestRender).toHaveBeenCalled();
   });
 });
 
-it("pins performance on the first row without adding a row and fits narrow terminals", () => {
+it("keeps performance on its own row and fits narrow terminals", () => {
   const f = fakeUI();
   let badge = "\uf0172.1s \uf0e782t/s";
   const h = installStatusline(f.ctx as any, { performance: () => [{ kind: "text", intent: "accent", text: badge }] });
@@ -306,15 +306,15 @@ it("pins performance on the first row without adding a row and fits narrow termi
   const plain = (value: string) => value.replace(/\x1b\[[0-9;]*m/g, "");
   try {
     for (const width of [30, 60, 120, 200]) {
-      const rows = f.widgets.get(WIDGET_KEY)!.component.render(width).map(plain);
-      expect(rows[0].endsWith(badge)).toBe(true);
+      const rows = f.footer().render(width).map(plain);
+      expect(rows.some((row: string) => row.trimStart() === badge)).toBe(true);
       expect(rows[0].length).toBeLessThanOrEqual(width);
       expect(rows.join("\n").split(badge)).toHaveLength(2);
       expect(rows.length).toBeLessThanOrEqual(snap.config.maxLines);
     }
-    expect(f.widgets.get(WIDGET_KEY)!.component.render(8).join("")).not.toContain(badge);
+    expect(f.footer().render(8).join("")).not.toContain(badge);
     badge = "";
-    expect(f.widgets.get(WIDGET_KEY)!.component.render(120).join("")).not.toContain("82t/s");
+    expect(f.footer().render(120).join("")).not.toContain("82t/s");
     f.requestRender.mockClear();
     h.requestRender();
     expect(f.requestRender).toHaveBeenCalledTimes(1);
@@ -326,10 +326,36 @@ it("packs extension chips into available dashboard space", () => {
   const h = installStatusline(f.ctx as any, { performance: () => [{ kind: "text", text: "80t/s" }] });
   h.setSnapshot({ ...snap, config: { ...snap.config, row1: ["model"], row2: [], row3: [], row4: [], padding: 0 }, activity: { ...snap.activity, tools: [], agents: [], todos: null } });
   try {
-    const rows = f.widgets.get(WIDGET_KEY)!.component.render(120);
-    expect(rows).toHaveLength(1);
+    const rows = f.footer().render(120);
+    expect(rows).toHaveLength(2);
     expect(rows[0]).toContain("bg 2↻");
     expect(rows[0]).toContain("auto 3/100");
-    expect(rows[0].replace(/\x1b\[[0-9;]*m/g, "").endsWith("80t/s")).toBe(true);
+    expect(rows[1].replace(/\x1b\[[0-9;]*m/g, "").trimStart()).toBe("80t/s");
   } finally { h.dispose(); }
+});
+
+it("packs an inline Lens chip with left widgets and routes only its painted cells", () => {
+  const plain = (text: string) => text.replace(/\x1b\[[0-9;]*m/g, "");
+  const registry = ((globalThis as any)[Symbol.for("pi.inline-status-widgets.v1")] ??= { widgets: new Map(), consumers: new Set() });
+  const click = mock(() => ({ handled: true, render: true }));
+  registry.widgets.set("pi-lens", { render: () => "◇ lens ✓ clean", handleMouse: click });
+  const f = fakeUI();
+  const h = installStatusline(f.ctx as any, {});
+  h.setSnapshot({ ...snap, widgets: { model: { visible: true, spans: [{ kind: "text", text: "MODEL" }] } }, config: { ...snap.config, row1: ["model"], row2: [], row3: [], row4: [], padding: 0, activityRows: 0 } });
+  try {
+    const rows = f.footer().render(80).map(plain);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toContain("MODEL │ ◇ lens ✓ clean");
+    expect(f.footer().handleMouse({ type: "click", button: "left", x: 0, y: 0 })).toBeUndefined();
+    expect(click).not.toHaveBeenCalled();
+    const x = rows[0].indexOf("◇ lens");
+    expect(f.footer().handleMouse({ type: "click", button: "left", x, y: 0 }).handled).toBe(true);
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(f.footer().handleMouse({ type: "click", button: "left", x, y: 1 })).toBeUndefined();
+    const narrow = f.footer().render(16).map(plain);
+    expect(narrow.some((row: string) => row.includes("◇ lens"))).toBe(true);
+    const y = narrow.findIndex((row: string) => row.includes("◇ lens"));
+    f.footer().handleMouse({ type: "click", button: "left", x: narrow[y].indexOf("◇ lens"), y });
+    expect(click).toHaveBeenCalledTimes(2);
+  } finally { registry.widgets.delete("pi-lens"); h.dispose(); }
 });

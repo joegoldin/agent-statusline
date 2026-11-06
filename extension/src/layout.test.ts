@@ -192,7 +192,7 @@ describe("renderRows", () => {
     };
     const c = quiet.config;
     const names = [...(c.row1 ?? []), ...(c.row2 ?? []), ...(c.row3 ?? []), ...(c.row4 ?? [])];
-    quiet.config = { ...c, hide: [...c.hide, "context"] };
+    quiet.config = { ...c, hide: [...c.hide, "context", "tokens", "voice"] };
     for (const width of [60, 80, 120]) {
       expect(renderRows(quiet, width, theme, NOW)).toEqual(wrapRow(names, quiet, width, theme));
     }
@@ -217,14 +217,32 @@ describe("renderRows", () => {
 });
 
 
-it("docks context beside performance and removes live command activity", () => {
- const { theme } = recordingTheme();
- const fixture: Snapshot = { ...snap, widgets: { model: { visible: true, spans: [{ kind: "text", text: "MODEL" }] }, context: { visible: true, spans: [{ kind: "text", text: "CTX70%" }] } },
- config: { ...snap.config, row1: ["model", "context"], row2: [], row3: [], row4: [], padding: 0 },
- activity: { ...snap.activity, tools: [{ id: "1", name: "find", state: "running", startedAtMs: NOW - 4000 }], agents: [], todos: null } };
- const rows = renderRows(fixture, 100, theme, NOW, "80t/s");
- expect(rows).toHaveLength(1);
- const plain = rows[0].replace(/\x1b\[[0-9;]*m/g, "");
- expect(plain).toMatch(/MODEL\s{10,}CTX70%.*80t\/s$/);
- expect(rows.join("\n")).not.toContain("find");
+it("keeps context and performance on separate right-aligned lines without changing their spans", () => {
+  const { theme } = recordingTheme();
+  const fixture: Snapshot = { ...snap, widgets: { model: { visible: true, spans: [{ kind: "text", text: "MODEL" }] }, context: { visible: true, spans: [{ kind: "text", text: "CTX70%" }] }, tokens: { visible: true, spans: [{ kind: "text", text: "152.6k tokens" }] }, voice: { visible: true, spans: [{ kind: "text", text: "♦ toggle" }] } },
+    config: { ...snap.config, row1: ["model", "context", "tokens", "voice"], row2: [], row3: [], row4: [], padding: 0 },
+    activity: { ...snap.activity, tools: [{ id: "1", name: "find", state: "running", startedAtMs: NOW - 4000 }], agents: [], todos: null } };
+  const rows = renderRows(fixture, 100, theme, NOW, "80t/s");
+  expect(rows).toHaveLength(3);
+  const plain = rows.map(row => row.replace(/\x1b\[[0-9;]*m/g, ""));
+  expect(plain[0]).toBe("MODEL");
+  expect(plain[1]).toMatch(/^ +80t\/s$/);
+  expect(plain[2]).toMatch(/^ +152\.6k tokens.*CTX70%$/);
+  expect(plain[1].length).toBe(100);
+  expect(plain[2].length).toBe(100);
+  expect(rows.join("\n")).not.toContain("find");
+  expect(rows.join("\n")).not.toContain("toggle");
+});
+
+it("attaches the subscription icon to model and effort without a pipe, but leaves API costs separate", () => {
+  const { theme } = recordingTheme();
+  const fixture: Snapshot = { ...snap, widgets: {
+    model: { visible: true, spans: [{ kind: "text", intent: "accent", text: "GPT-6.1 Sol medium" }] },
+    cost: { visible: true, spans: [{ kind: "text", intent: "meta", text: "" }] },
+  }, config: { ...snap.config, row1: ["model"], row2: ["cost"], row3: [], row4: [], padding: 0, activityRows: 0 } };
+  const plain = (text: string) => text.replace(/\x1b\[[0-9;]*m/g, "");
+  expect(renderRows(fixture, 80, theme, NOW).map(plain)).toEqual(["GPT-6.1 Sol medium "]);
+  expect(fixture.widgets.model.spans).toHaveLength(1);
+  fixture.widgets.cost.spans![0].text = "$0.23";
+  expect(renderRows(fixture, 80, theme, NOW).map(plain)).toEqual(["GPT-6.1 Sol medium │ $0.23"]);
 });

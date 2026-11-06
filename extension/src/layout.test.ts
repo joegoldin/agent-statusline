@@ -223,13 +223,12 @@ it("keeps context and performance on separate right-aligned lines without changi
     config: { ...snap.config, row1: ["model", "context", "tokens", "voice"], row2: [], row3: [], row4: [], padding: 0 },
     activity: { ...snap.activity, tools: [{ id: "1", name: "find", state: "running", startedAtMs: NOW - 4000 }], agents: [], todos: null } };
   const rows = renderRows(fixture, 100, theme, NOW, "80t/s");
-  expect(rows).toHaveLength(3);
+  expect(rows).toHaveLength(2);
   const plain = rows.map(row => row.replace(/\x1b\[[0-9;]*m/g, ""));
-  expect(plain[0]).toBe("MODEL");
-  expect(plain[1]).toMatch(/^ +80t\/s$/);
-  expect(plain[2]).toMatch(/^ +152\.6k tokens.*CTX70%$/);
+  expect(plain[0]).toMatch(/^MODEL +80t\/s$/);
+  expect(plain[1]).toMatch(/^ +152\.6k tokens.*CTX70%$/);
+  expect(plain[0].length).toBe(100);
   expect(plain[1].length).toBe(100);
-  expect(plain[2].length).toBe(100);
   expect(rows.join("\n")).not.toContain("find");
   expect(rows.join("\n")).not.toContain("toggle");
 });
@@ -245,4 +244,57 @@ it("attaches the subscription icon to model and effort without a pipe, but leave
   expect(fixture.widgets.model.spans).toHaveLength(1);
   fixture.widgets.cost.spans![0].text = "$0.23";
   expect(renderRows(fixture, 80, theme, NOW).map(plain)).toEqual(["GPT-6.1 Sol medium │ $0.23"]);
+});
+
+it("reserves both right columns before wrapping the left widgets", () => {
+  const { theme } = recordingTheme();
+  const text = (value: string) => ({ visible: true, spans: [{ kind: "text" as const, text: value }] });
+  const fixture: Snapshot = { ...snap, config: { ...snap.config, row1: ["model", "cwd", "git"], row2: ["tokens", "context"], row3: [], row4: [], padding: 0, activityRows: 0 },
+    widgets: { model: text("M".repeat(20)), cwd: text("P".repeat(40)), git: text("G".repeat(12)), tokens: text("152.6k tokens"), context: text("CTX70%") } };
+  const rows = renderRows(fixture, 80, theme, NOW, "80t/s").map(row => row.replace(/\x1b\[[0-9;]*m/g, ""));
+  expect(rows).toHaveLength(2);
+  expect(rows[0]).toContain("M".repeat(20) + " │ " + "P".repeat(40));
+  expect(rows[0]).not.toContain("G");
+  expect(rows[0].endsWith("80t/s")).toBe(true);
+  expect(rows[1].startsWith("G".repeat(12))).toBe(true);
+  expect(rows[1].endsWith("152.6k tokens │ CTX70%")).toBe(true);
+  expect(rows.every(row => row.length === 80)).toBe(true);
+});
+
+it("combines narrow-screen widgets and metrics into one left-aligned wrapping flow", () => {
+  const { theme } = recordingTheme();
+  const text = (value: string) => ({ visible: true, spans: [{ kind: "text" as const, text: value }] });
+  const fixture: Snapshot = { ...snap, config: { ...snap.config, row1: ["model", "cwd"], row2: ["tokens", "context"], row3: [], row4: [], padding: 0, activityRows: 0 },
+    widgets: { model: text("MODEL"), cwd: text("PATH"), tokens: text("152.6k tokens"), context: text("CTX70%") } };
+  const rows = renderRows(fixture, 40, theme, NOW, "80t/s").map(row => row.replace(/\x1b\[[0-9;]*m/g, ""));
+  expect(rows[0]).toBe("MODEL │ PATH │ 80t/s");
+  expect(rows[1]).toBe("152.6k tokens │ CTX70%");
+  expect(rows.every(row => !row.startsWith(" ") && piVisibleWidth(row) <= 40)).toBe(true);
+});
+
+it("fits reserved and combined layouts by cell width, including ANSI, wide glyphs and padding", () => {
+  const { theme } = recordingTheme();
+  const fixture = { ...snap, activity: { ...snap.activity, tools: [], agents: [], todos: null } };
+  for (const padding of [0, 2, 9]) {
+    fixture.config = { ...snap.config, padding };
+    for (let width = 1; width <= 160; width++) {
+      const rows = renderRows(fixture, width, theme, NOW, "\x1b[36m界 80t/s\x1b[39m", ["\x1b[32m◇ lens ✓ clean\x1b[39m"]);
+      expect(rows.every(row => piVisibleWidth(row) <= width)).toBe(true);
+    }
+  }
+});
+
+it("keeps activity out of metric-only rows when there are no left widgets", () => {
+  const { theme } = recordingTheme();
+  const fixture: Snapshot = { ...snap, widgets: {}, config: { ...snap.config, row1: [], row2: [], row3: [], row4: [], padding: 2, activityRows: 2 },
+    activity: { tools: [], todos: null, agents: [{ name: "A".repeat(100), model: "m", startedAtMs: NOW }] } };
+  const rows = renderRows(fixture, 80, theme, NOW, "80t/s");
+  expect(rows.every(row => piVisibleWidth(row) <= 80)).toBe(true);
+});
+
+it("counts separators after zero-cell ANSI chips instead of clipping the next widget", () => {
+  const { theme } = recordingTheme();
+  const rows = wrapRow([], snap, 73, theme, 73, ["\x1b[36m\x1b[39m", "B".repeat(20), "C".repeat(50)]);
+  expect(rows.join("\n")).toContain("C".repeat(50));
+  expect(rows.every(row => piVisibleWidth(row) <= 73)).toBe(true);
 });

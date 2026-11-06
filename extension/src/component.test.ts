@@ -298,7 +298,7 @@ describe("installStatusline", () => {
   });
 });
 
-it("keeps performance on its own row and fits narrow terminals", () => {
+it("keeps performance visible once in docked and narrow wrapping layouts", () => {
   const f = fakeUI();
   let badge = "\uf0172.1s \uf0e782t/s";
   const h = installStatusline(f.ctx as any, { performance: () => [{ kind: "text", intent: "accent", text: badge }] });
@@ -307,7 +307,7 @@ it("keeps performance on its own row and fits narrow terminals", () => {
   try {
     for (const width of [30, 60, 120, 200]) {
       const rows = f.footer().render(width).map(plain);
-      expect(rows.some((row: string) => row.trimStart() === badge)).toBe(true);
+      expect(rows.join("\n")).toContain(badge);
       expect(rows[0].length).toBeLessThanOrEqual(width);
       expect(rows.join("\n").split(badge)).toHaveLength(2);
       expect(rows.length).toBeLessThanOrEqual(snap.config.maxLines);
@@ -327,10 +327,10 @@ it("packs extension chips into available dashboard space", () => {
   h.setSnapshot({ ...snap, config: { ...snap.config, row1: ["model"], row2: [], row3: [], row4: [], padding: 0 }, activity: { ...snap.activity, tools: [], agents: [], todos: null } });
   try {
     const rows = f.footer().render(120);
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(1);
     expect(rows[0]).toContain("bg 2↻");
     expect(rows[0]).toContain("auto 3/100");
-    expect(rows[1].replace(/\x1b\[[0-9;]*m/g, "").trimStart()).toBe("80t/s");
+    expect(rows[0].replace(/\x1b\[[0-9;]*m/g, "").endsWith("80t/s")).toBe(true);
   } finally { h.dispose(); }
 });
 
@@ -340,11 +340,11 @@ it("packs an inline Lens chip with left widgets and routes only its painted cell
   const click = mock(() => ({ handled: true, render: true }));
   registry.widgets.set("pi-lens", { render: () => "◇ lens ✓ clean", handleMouse: click });
   const f = fakeUI();
-  const h = installStatusline(f.ctx as any, {});
-  h.setSnapshot({ ...snap, widgets: { model: { visible: true, spans: [{ kind: "text", text: "MODEL" }] } }, config: { ...snap.config, row1: ["model"], row2: [], row3: [], row4: [], padding: 0, activityRows: 0 } });
+  const h = installStatusline(f.ctx as any, { performance: () => [{ kind: "text", text: "80t/s" }] });
+  h.setSnapshot({ ...snap, widgets: { model: { visible: true, spans: [{ kind: "text", text: "MODEL" }] }, context: { visible: true, spans: [{ kind: "text", text: "CTX70%" }] } }, config: { ...snap.config, row1: ["model"], row2: ["context"], row3: [], row4: [], padding: 0, activityRows: 0 } });
   try {
     const rows = f.footer().render(80).map(plain);
-    expect(rows).toHaveLength(1);
+    expect(rows).toHaveLength(2);
     expect(rows[0]).toContain("MODEL │ ◇ lens ✓ clean");
     expect(f.footer().handleMouse({ type: "click", button: "left", x: 0, y: 0 })).toBeUndefined();
     expect(click).not.toHaveBeenCalled();

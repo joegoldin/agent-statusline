@@ -32,11 +32,13 @@ the renderer. `internal/e2e/testdata/pi-*.golden` keep it under test.
 
 ## Compact Pi response timing
 
-Response performance and conversation context usage each have their own
-right-aligned line below the dashboard, retaining their existing icons, colours
-and meter styles. The conversation token count and context percentage share
-the context line, with the usual pipe separator. The native footer keeps these
-below expanded Lens and Jobs widgets regardless of extension load order.
+Response performance and conversation context usage occupy separate right-hand
+rows, retaining their existing icons, colours and meter styles. Their space is
+reserved before the left-hand widgets wrap. On narrow terminals, everything
+joins one left-aligned wrapping flow. The conversation token count and context
+percentage share a pipe-separated widget when they fit together.
+The native footer keeps these below expanded Lens and Jobs widgets regardless
+of extension load order.
 The redundant voice backend-mode label is hidden in Pi.
 Response performance uses up to 16 cells, with clock and lightning icons from
 Nerd Font. While waiting,

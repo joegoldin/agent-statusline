@@ -131,31 +131,29 @@ export function wrapRow(names: string[], snap: Snapshot, width: number, theme: T
   const texts = segments(names, snap, width, theme)
     .filter((s) => !s.flex)
     .map((s) => s.text).concat(tail);
-  if (texts.length === 0) return [];
+  return wrapTexts(texts, sep, width, row => row === 0 ? firstWidth : width);
+}
 
-  const sepW = visibleWidth(sep);
+function wrapTexts(texts: string[], separator: string, width: number, rowWidth: (row: number) => number): string[] {
   const lines: string[] = [];
-  let cur = "";
-  let curW = 0;
-  for (const t of texts) {
-    const tw = visibleWidth(t);
-    if (cur === "") {
-      cur = t;
-      curW = tw;
-    } else if (width > 0 && curW + sepW + tw > (lines.length === 0 ? firstWidth : width)) {
-      lines.push(cur);
-      cur = t;
-      curW = tw;
-    } else {
-      cur += sep + t;
-      curW += sepW + tw;
+  const sepWidth = visibleWidth(separator);
+  let current = "";
+  let used = 0;
+  for (const text of texts) {
+    const cells = visibleWidth(text);
+    if (current && width > 0 && used + sepWidth + cells > rowWidth(lines.length)) {
+      lines.push(current);
+      current = "";
+      used = 0;
     }
+    // A widget too wide beside a metric moves below it, rather than being
+    // clipped into the reserved cells or painting over the right column.
+    while (!current && width > 0 && cells > rowWidth(lines.length) && rowWidth(lines.length) < width) lines.push("");
+    used += (current ? sepWidth : 0) + cells;
+    current += (current ? separator : "") + text;
   }
-  if (cur !== "") lines.push(cur);
-  return width > 0 ? lines.map((l, i) => {
-    const limit = i === 0 ? firstWidth : width;
-    return visibleWidth(l) > limit ? truncateEnd(l, limit) : l;
-  }) : lines;
+  if (current) lines.push(current);
+  return width > 0 ? lines.map((line, row) => truncateEnd(line, rowWidth(row))) : lines;
 }
 
 /**
@@ -164,9 +162,9 @@ export function wrapRow(names: string[], snap: Snapshot, width: number, theme: T
  * Every dashboard widget, rows 1 to 4 in order, is packed into as few lines as
  * fit: a line breaks only when the next widget would not fit on it, so a widget
  * left over from row 1 shares its line with row 2's rather than taking a line
- * of its own. Nothing is truncated. Speed and context keep separate right-aligned rows. A single
- * activity line joins the last dashboard line when it fits there too; otherwise activity fills what is left
- * of the line budget, as before.
+ * of its own. Speed and context reserve separate right-hand rows before the
+ * left flow is wrapped. Compact terminals combine everything on the left.
+ * Activity uses any remaining room within the line budget.
  *
  * This packs tighter than main.go, which keeps rows 1 and 2 as separate wrapped
  * blocks unless both fit on one line. pi's footer sits under the prompt and
@@ -197,35 +195,43 @@ export function renderRows(
       cost: { ...cost, visible: false },
     } };
   }
-  const context = segments(["tokens", "context"].filter(name => names.includes(name)), snap, width, theme).map(segment => segment.text).join(sep);
-  // Preserve each metric's painted spans, but give speed and context their
-  // own rows so neither competes with the identity line for horizontal space.
-  const metrics = [right, context].filter(Boolean).slice(0, maxLines).map(text => {
-    const fitted = width > 0 ? truncateEnd(text, width) : text;
-    return " ".repeat(Math.max(0, width - visibleWidth(fitted))) + fitted;
-  });
+  const contextParts = segments(["tokens", "context"].filter(name => names.includes(name)), snap, width, theme).map(segment => segment.text);
+  const context = contextParts.join(sep);
+  const padding = Math.max(0, width > 0 ? Math.min(cfg.padding, width - 1) : cfg.padding);
+  const innerWidth = width > 0 ? width - padding : 0;
+  const metrics = [right, context].filter(Boolean).slice(0, maxLines);
+  // Use the existing compact breakpoint, and fall back sooner if a metric
+  // would leave fewer than twelve cells for the left-hand widgets.
+  const dock = width >= cfg.compactWidth && width > 0 && metrics.every(text => visibleWidth(text) + 14 <= innerWidth);
+  const pinned = dock ? metrics : [];
+  const rowWidth = (row: number) => innerWidth - (pinned[row] ? visibleWidth(pinned[row]) + 2 : 0);
   // Voice is already visible in the prompt; its backend mode is not a status.
   const flow = names.filter(name => name !== "context" && name !== "tokens" && name !== "voice");
-  const dashboard = wrapRow(flow, snap, width, theme, width, inline)
-    .filter((l) => l.trim().length > 0)
-    .slice(0, inline.length ? undefined : Math.max(0, maxLines - metrics.length));
+  const texts = segments(flow, snap, width, theme).filter(segment => !segment.flex).map(segment => segment.text).concat(inline);
+  if (!dock) {
+    if (right) texts.push(right);
+    if (context) texts.push(...(innerWidth > 0 && visibleWidth(context) > innerWidth ? contextParts : [context]));
+  }
+  const dashboard = wrapTexts(texts, sep, innerWidth, rowWidth)
+    .slice(0, inline.length ? undefined : maxLines);
 
-  const budget = Math.min(maxLines - dashboard.length - metrics.length, cfg.activityRows ?? 0);
-  // Asked for one extra row, in case the first activity line moves up.
-  const activity = budget > 0 ? activityRows({ ...snap, activity: { ...snap.activity, tools: [] } }, width, theme, now, budget + 1) : [];
+  const budget = Math.min(maxLines - Math.max(dashboard.length, pinned.length), cfg.activityRows ?? 0);
+  const activity = budget > 0 ? activityRows({ ...snap, activity: { ...snap.activity, tools: [] } }, innerWidth, theme, now, budget + 1) : [];
   const last = dashboard.length - 1;
   if (activity.length > 0 && last >= 0) {
-    const joined = dashboard[last] + sep + activity[0];
-    if (width <= 0 || visibleWidth(joined) <= width) {
+    const joined = dashboard[last] + (dashboard[last] ? sep : "") + activity[0];
+    if (innerWidth <= 0 || visibleWidth(joined) <= rowWidth(last)) {
       dashboard[last] = joined;
       activity.shift();
     }
   }
 
-  const padding = cfg.padding > 0 ? cfg.padding : 0;
-  const pad = padding > 0 ? " ".repeat(padding) : "";
-  const rows = [...dashboard, ...activity.slice(0, Math.max(0, budget))]
-    .map((l) => (pad ? pad + truncateEnd(l, width - padding) : l))
-    .filter((l) => l.trim().length > 0);
-  return [...rows, ...metrics];
+  const left = [...dashboard];
+  while (left.length < pinned.length) left.push("");
+  left.push(...activity.slice(0, Math.max(0, budget)));
+  return Array.from({ length: Math.max(left.length, pinned.length) }, (_, row) => {
+    const body = " ".repeat(padding) + (left[row] ?? "");
+    const metric = pinned[row] ?? "";
+    return metric ? body + " ".repeat(Math.max(0, width - visibleWidth(body) - visibleWidth(metric))) + metric : body;
+  }).filter(line => line.trim().length > 0);
 }

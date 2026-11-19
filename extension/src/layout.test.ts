@@ -233,6 +233,26 @@ it("keeps context and performance on separate right-aligned lines without changi
   expect(rows.join("\n")).not.toContain("toggle");
 });
 
+it("keeps the compaction count immediately after context in both footer layouts", () => {
+  const { theme } = recordingTheme();
+  const fixture: Snapshot = { ...snap, widgets: {
+    model: { visible: true, spans: [{ kind: "text", text: "MODEL" }] },
+    context: { visible: true, spans: [{ kind: "text", text: "CTX70%" }] },
+    compaction: { visible: true, spans: [{ kind: "text", text: "3c" }] },
+  },
+    config: { ...snap.config, row1: ["model", "compaction", "context"], row2: [], row3: [], row4: [], activityRows: 0, padding: 0 },
+  };
+  const metrics = ["CTX70%", "3c"].join(fixture.config.separator);
+  const wide = renderRows(fixture, 120, theme, NOW, "80t/s").map(row => row.replace(/\x1b\[[0-9;]*m/g, ""));
+  expect(wide[1]?.endsWith(metrics)).toBe(true);
+  expect(piVisibleWidth(wide[1]!)).toBe(120);
+  expect(wide[0]).not.toContain("3c");
+  const narrow = renderRows(fixture, 18, theme, NOW, "80t/s").map(row => row.replace(/\x1b\[[0-9;]*m/g, ""));
+  expect(narrow).toContain(metrics);
+  const hidden = { ...fixture, config: { ...fixture.config, hide: ["compaction"] } };
+  expect(renderRows(hidden, 120, theme, NOW).join("\n")).not.toContain("3c");
+});
+
 it("attaches the subscription icon to model and effort without a pipe, but leaves API costs separate", () => {
   const { theme } = recordingTheme();
   const fixture: Snapshot = { ...snap, widgets: {

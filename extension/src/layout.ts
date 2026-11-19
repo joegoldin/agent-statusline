@@ -195,7 +195,8 @@ export function renderRows(
       cost: { ...cost, visible: false },
     } };
   }
-  const contextParts = segments(["tokens", "context"].filter(name => names.includes(name)), snap, width, theme).map(segment => segment.text);
+  const contextWidgets = ["tokens", "context", "compaction"];
+  const contextParts = segments(contextWidgets.filter(name => names.includes(name)), snap, width, theme).map(segment => segment.text);
   const context = contextParts.join(sep);
   const padding = Math.max(0, width > 0 ? Math.min(cfg.padding, width - 1) : cfg.padding);
   const innerWidth = width > 0 ? width - padding : 0;
@@ -206,7 +207,7 @@ export function renderRows(
   const pinned = dock ? metrics : [];
   const rowWidth = (row: number) => innerWidth - (pinned[row] ? visibleWidth(pinned[row]) + 2 : 0);
   // Voice is already visible in the prompt; its backend mode is not a status.
-  const flow = names.filter(name => name !== "context" && name !== "tokens" && name !== "voice");
+  const flow = names.filter(name => !contextWidgets.includes(name) && name !== "voice");
   const texts = segments(flow, snap, width, theme).filter(segment => !segment.flex).map(segment => segment.text).concat(inline);
   if (!dock) {
     if (right) texts.push(right);

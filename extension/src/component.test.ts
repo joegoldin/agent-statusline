@@ -334,7 +334,7 @@ it("packs extension chips into available dashboard space", () => {
   } finally { h.dispose(); }
 });
 
-it("packs an inline Lens chip with left widgets and routes only its painted cells", () => {
+it("packs inline chips and routes clicks only to interactive widgets within their painted cells", () => {
   const plain = (text: string) => text.replace(/\x1b\[[0-9;]*m/g, "");
   const registry = ((globalThis as any)[Symbol.for("pi.inline-status-widgets.v1")] ??= { widgets: new Map(), consumers: new Set() });
   const click = mock(() => ({ handled: true, render: true }));
@@ -357,5 +357,8 @@ it("packs an inline Lens chip with left widgets and routes only its painted cell
     const y = narrow.findIndex((row: string) => row.includes("◇ lens"));
     f.footer().handleMouse({ type: "click", button: "left", x: narrow[y].indexOf("◇ lens"), y });
     expect(click).toHaveBeenCalledTimes(2);
+    registry.widgets.set("pi-lens", { render: () => "◇ lens ✓ clean" });
+    expect(f.footer().render(80).map(plain)[0]).toContain("◇ lens ✓ clean");
+    expect(f.footer().handleMouse({ type: "click", button: "left", x, y: 0 })).toBeUndefined();
   } finally { registry.widgets.delete("pi-lens"); h.dispose(); }
 });

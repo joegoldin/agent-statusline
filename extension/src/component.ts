@@ -59,7 +59,7 @@ const FAST_STATUS_KEY = "pi-fast";
 
 interface InlineWidget {
   render(width: number, theme: ThemeLike): string;
-  handleMouse(event: { type: string; button: string; x: number; y: number }): unknown;
+  handleMouse?(event: { type: string; button: string; x: number; y: number }): unknown;
 }
 interface InlineRegistry {
   widgets: Map<string, InlineWidget>;
@@ -234,6 +234,7 @@ export function installStatusline(ctx: PiUIContext, deps: InstallDeps): Statusli
         const row = lastGood[event.y];
         if (row === undefined) return;
         for (const { text, widget } of inlineChips) {
+          if (!widget.handleMouse) continue;
           const offset = row.indexOf(text);
           if (offset < 0) continue;
           const start = visibleWidth(row.slice(0, offset));
